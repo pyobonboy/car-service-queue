@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://static.toss.im/tds/43.9.4/css/tds.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://static.toss.im/tps/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://static.toss.im/tps/others.css" />
+    <script src="https://cdn.tossplace.com/toss-front-sdk/v0/index.js"></script>
+    <script src="./sdk.js"></script>
+    <script src="./api-config.js"></script>
+    <title>결제 - Toss Front Plugin</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      // 이 화면(html)은 실제 단말기에서는 토스프론트 로컬 서버(예: 172.30.1.54:9900)에서 서빙되므로
+      // fetch를 상대경로로 호출하면 백엔드가 아니라 그 로컬 주소로 요청이 나가버린다.
+      // API 주소는 api-config.js에 빌드 시 주입한다. 백엔드가 직접 서빙하는 미리보기는 상대경로를 쓴다.
+      const API_BASE = window.CHEVROLET_API_BASE_URL
+      const PHONE_RE = /^01[0-9]{8,9}$/
+
+      // NOTE: 이 매장은 POS 주문 시스템이 따로 없어 결제금액을 직원이 단말기에서 직접 입력한다.
+      // 만약 나중에 주문/상품 시스템이 생기면 sdk.template.renderOrderPage 흐름(order.html 참고)으로 교체.
+      function showAmountInput(errorText) {
+        sdk.template.renderInputPage({
+          type: 'number',
+          top: {
+            title: '결제 금액을 입력해주세요',
+            subtitle: errorText || '원 단위',
+          },
+          input: { placeholder: '금액 입력' },
+          button: { label: '결제 진행' },
+          onSubmit: async (value) => {
+            const amount = Number(value)
+            if (!Number.isFinite(amount) || amount <= 0) {
+              showAmountInput('결제 금액이 올바르지 않습니다.')
+              return
+            }
+            await startPayment(amount)
+          },
+          onBack: () => {
+            location.href = './index.html'
+          },
+        })
+      }
+
+      async function startPayment(amount) {
+        const paymentKey = crypto.randomUUID()
+        const tax = Math.floor(amount / 11)
+        const supplyValue = amount - tax
+
+        try {
+          const result = await sdk.payment.requestPayment({
+            paymentKey,
+            tax,
+            supplyValue,
+            tip: 0,
+            timeoutMs: 60000,
+          })
+
+          if (result.type === 'CANCELED' || result.type === 'TIMEOUT') {
+            location.href = './index.html'
+            return
+          }
+
+          if (result.type !== 'SUCCESS') {
+            sdk.template.renderResultPage({
+              type: 'image',
+              status: 'error',
+              title: '결제에 실패했습니다.',
+              timerMs: 3000,
+              onTimeout: () => showAmountInput(),
+              localeCode: 'ko',
+            })
+            return
+          }
+
+          showConsent({ paymentKey, amount })
+        } catch (err) {
+          sdk.template.renderResultPage({
+            type: 'image',
+            status: 'error',
+            title: '결제 처리 중 오류가 발생했습니다.',
+            timerMs: 3000,
+            onTimeout: () => showAmountInput(),
+            localeCode: 'ko',
+          })
+        }
+      }
+
+      // 고지 문구는 개인정보보호법 제15조제2항이 요구하는 4가지(수집 항목 / 수집·이용 목적 /
+      // 보유·이용 기간 / 동의 거부 권리와 그에 따른 불이익)를 모두 담았다.
+      //
+      // ⚠️ 보유기간 '3년'은 서버의 DATA_RETENTION_DAYS(기본 1095일)와 같은 값이어야 한다.
+      //    한쪽만 바꾸면 손님에게 말한 기간과 실제 파기 시점이 어긋난다.
+      //
+      // TODO(법무 검토): 보유기간 3년의 근거(정비업에 별도 기록 보관 의무가 있으면 그 기간과
+      // 나눠서 관리해야 한다)와 회사명·연락처·구체적인
+      // 보유기간은 임의로 채우지 않았다(개인정보보호법 제15조, 정보통신망법 제50조 대응).
+      //
+      // 결제(sdk.payment.requestPayment)는 이미 끝난 뒤라는 점이 중요하다 — 결제는 되돌릴 수
+      // 없으므로, 이 동의 화면의 onBack/"동의하지 않음"이 결제 화면(showAmountInput)으로 돌아가면
+      // 절대 안 된다(다시 결제를 시도하면 이중결제 위험). 동의하지 않으면 전화번호를 아예 받지
+      // 않고 영수증 발송만 건너뛴 채 결제완료 안내로 끝낸다(showDeclinedResult).
+      function showConsent({ paymentKey, amount }) {
+        sdk.template.renderSelectPage({
+          title: '전자영수증을 받으시려면 동의가 필요합니다',
+          subtitle:
+            '수집 항목: 전화번호(예약 시 등록된 차량번호가 있으면 함께 사용)\n' +
+            '수집 목적: 전자영수증 발송, 정비 이력 관리\n' +
+            '보유 기간: 수집일로부터 3년, 이후 지체 없이 파기\n' +
+            '동의를 거부하실 수 있으며, 거부하셔도 결제는 정상 진행됩니다(영수증만 발송되지 않습니다).\n' +
+            '광고성 정보 수신 동의는 선택이며, 거부하셔도 결제·영수증 수신에 제한이 없습니다.',
+          options: [
+            {
+              title: '필수 항목에만 동의하고 계속',
+              onClick: () =>
+                askPhoneForReceipt({ paymentKey, amount, consent: { privacyConsent: true, marketingConsent: false } }),
+            },
+            {
+              title: '필수 + 광고성 정보 수신에 모두 동의',
+              onClick: () =>
+                askPhoneForReceipt({ paymentKey, amount, consent: { privacyConsent: true, marketingConsent: true } }),
+            },
+            {
+              title: '동의하지 않음',
+              onClick: () => showDeclinedResult(),
+            },
+          ],
+          onBack: () => {
+            showDeclinedResult()
+          },
+        })
+      }
+
+      function showDeclinedResult() {
+        sdk.template.renderResultPage({
+          type: 'text',
+          text: '결제 완료',
+          title: '결제가 완료되었습니다',
+          description: '전자영수증 동의를 받지 못해 영수증은 발송하지 않았습니다',
+          timerMs: 5000,
+          onTimeout: () => {
+            location.href = './index.html'
+          },
+          localeCode: 'ko',
+        })
+      }
+
+      // 차량번호는 여기서 다시 입력받지 않는다. 전화번호만 받으면 서버가 그 번호로 등록된
+      // 예약 기록(차량번호+정비항목)을 찾아 영수증에 그대로 넣어준다 (submitPayment 참고).
+      function askPhoneForReceipt({ paymentKey, amount, consent }, errorText) {
+        sdk.template.renderInputPage({
+          type: 'phone',
+          top: {
+            title: '전자영수증을 받으실\n전화번호를 입력해주세요',
+            subtitle: errorText || '결제가 완료되었습니다',
+          },
+          input: { placeholder: '전화번호 입력' },
+          button: { label: '영수증 받기' },
+          onSubmit: async (value) => {
+            const phone = value.replace(/-/g, '').trim()
+            if (!PHONE_RE.test(phone)) {
+              askPhoneForReceipt({ paymentKey, amount, consent }, '전화번호 형식이 올바르지 않습니다.')
+              return
+            }
+            await submitPayment({ paymentKey, amount, phone, consent })
+          },
+          onBack: () => {
+            // 결제 화면으로는 못 돌아간다(위 showConsent 주석 참고) — 동의 화면으로만 되돌린다.
+            showConsent({ paymentKey, amount })
+          },
+        })
+      }
+
+      async function submitPayment({ paymentKey, amount, phone, consent }) {
+        try {
+          // App API(https://docs.tossplace.com/reference/plugin-sdk/front/app.html)의 비동기 함수.
+          // 실제 단말기에서는 토스프론트가 그 단말기에 온보딩된 실제 가맹점 정보를 반환하고,
+          // 로컬 브라우저 미리보기에서는 sdk.js가 채워둔 테스트 매장 정보가 반환된다.
+          const merchant = await sdk.app.getMerchant()
+          const merchantId = merchant?.id
+          // privacyConsent/marketingConsent는 showConsent 화면에서 손님이 실제로 고른 값을 그대로
+          // 전달한다 — 서버가 privacyConsent !== true면 400으로 거부하므로 여기서 하드코딩하면 안 된다.
+          const res = await fetch(`${API_BASE}/api/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paymentKey,
+              amount,
+              phone,
+              merchantId,
+              privacyConsent: consent.privacyConsent,
+              marketingConsent: consent.marketingConsent,
+            }),
+          })
+          const json = await res.json().catch(() => ({}))
+
+          // 서버는 응답에 차량번호/정비항목을 더 이상 싣지 않는다 — merchantId+전화번호만으로
+          // 호출되는 이 요청의 응답에 그 정보를 실으면, 남의 전화번호만 알아도 그 사람이 이
+          // 매장에 어떤 차를 맡겼는지 알아낼 수 있었다(실제 개인정보 유출 수정). 손님은 자기
+          // 차 번호를 이미 알고 있으니 알림톡 문구만으로 충분하다.
+          sdk.template.renderResultPage({
+            type: 'text',
+            text: json.ok ? '영수증 발송 완료' : '영수증 발송 실패',
+            title: '결제가 완료되었습니다',
+            description: json.ok
+              ? '알림톡을 확인해주세요'
+              : '결제는 완료됐지만 영수증 발송에 실패했어요',
+            timerMs: 5000,
+            onTimeout: () => {
+              location.href = './index.html'
+            },
+            localeCode: 'ko',
+          })
+        } catch (err) {
+          sdk.template.renderResultPage({
+            type: 'image',
+            status: 'error',
+            title: '영수증 처리 중 오류가 발생했습니다.',
+            description: '결제는 이미 완료되었습니다.',
+            timerMs: 4000,
+            onTimeout: () => {
+              location.href = './index.html'
+            },
+            localeCode: 'ko',
+          })
+        }
+      }
+
+      showAmountInput()
+    </script>
+  </body>
+</html>

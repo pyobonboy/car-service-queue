@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>쉐보레 포스모스 · 관리자</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --blue: #3182f6;
+    --blue-dark: #1b64da;
+    --blue-tint: #eef4ff;
+    --ink: #191f28;
+    --muted: #8b95a1;
+    --border: #e5e8eb;
+    --surface: #f2f4f6;
+    --error: #f04452;
+    --green: #12b76a;
+  }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Malgun Gothic", sans-serif;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .top {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .top h1 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .top .actions { display: flex; gap: 8px; align-items: center; }
+  .top button, .top .status {
+    font-size: 13px;
+  }
+  #login-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #login-card {
+    width: 100%;
+    max-width: 360px;
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px 24px;
+  }
+  #login-card h1 {
+    font-size: 19px;
+    margin: 0 0 4px;
+  }
+  #login-card p {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 20px;
+  }
+  input[type="password"] {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 16px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    outline: none;
+    margin-bottom: 10px;
+  }
+  input[type="password"]:focus { border-color: var(--blue); background: #fff; }
+  button {
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    background: var(--blue);
+    color: #fff;
+  }
+  button:hover { background: var(--blue-dark); }
+  button.ghost {
+    background: transparent;
+    color: var(--muted);
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  button.ghost:hover { background: var(--surface); color: var(--ink); }
+  button:disabled { background: var(--border); color: #b0b8c1; cursor: not-allowed; }
+  .err { color: var(--error); font-size: 13px; min-height: 18px; margin: 0 0 6px; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px; display: none; }
+  .callnext {
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .callnext div { font-size: 14px; color: var(--muted); }
+  .callnext button { white-space: nowrap; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+  }
+  .tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .section { background: #fff; border-radius: 16px; padding: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge.waiting { background: var(--blue-tint); color: var(--blue); }
+  .badge.called, .badge.receipt_sent { background: #e7f9f1; color: var(--green); }
+  .badge.notify_failed, .badge.receipt_failed { background: #fdeeef; color: var(--error); }
+  .badge.completed { background: var(--surface); color: var(--ink); }
+  .badge.requested { background: var(--surface); color: var(--muted); }
+  .badge.cancelled { background: var(--surface); color: var(--muted); }
+  .empty { padding: 40px 12px; text-align: center; color: var(--muted); font-size: 14px; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .row-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .row-btn.call { color: var(--blue); border-color: var(--blue-tint); background: var(--blue-tint); }
+  .row-btn.complete { color: var(--green); border-color: #e7f9f1; background: #e7f9f1; }
+  .row-btn.retry { color: var(--blue); border-color: var(--blue-tint); background: var(--blue-tint); }
+  .row-btn.cancel { color: var(--error); border-color: #fdeeef; background: #fdeeef; }
+  .row-btn.call:disabled, .row-btn.complete:disabled, .row-btn.cancel:disabled { color: #b0b8c1; border-color: var(--border); background: var(--surface); cursor: not-allowed; }
+  .row-btn.del { color: var(--error); }
+  .row-btn:hover:not(:disabled) { filter: brightness(0.96); }
+  .load-more-wrap { padding: 12px; text-align: center; }
+  .row-btn.load-more { padding: 8px 16px; }
+  .refresh-note { font-size: 12px; color: var(--muted); margin: 10px 2px 0; }
+  .filterbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .filterbar .filter-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; font-size: 12px; }
+  .filterbar input[type="date"], .filterbar select, .filterbar input[type="search"] {
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+  }
+  .filterbar input[type="search"] { width: 160px; }
+  .filterbar input[type="date"]:focus, .filterbar select:focus, .filterbar input[type="search"]:focus { border-color: var(--blue); background: #fff; }
+  .filterbar button.ghost { padding: 8px 12px; font-size: 12px; width: auto; }
+  .filterbar button#failed-toggle-btn.active { background: var(--error); color: #fff; border-color: var(--error); }
+  .filterbar .filter-note { color: var(--muted); font-size: 12px; margin-left: auto; }
+  /* 배지 옆에 붙는 접수알림실패 보조 표식 — 상태 배지는 status 기준이라 intakeNotifyStatus는 따로 표기한다. */
+  .intake-fail-mark { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--error); }
+  .summary-card {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .summary-card .summary-item { display: flex; align-items: baseline; gap: 4px; }
+  .summary-card .summary-sub { color: var(--muted); font-size: 12px; }
+  .summary-card .summary-alert { color: var(--error); font-weight: 700; }
+  .pos-token-value {
+    font-family: "Consolas", monospace;
+    font-size: 12px;
+    background: var(--surface);
+    padding: 4px 8px;
+    border-radius: 6px;
+    margin-right: 6px;
+    word-break: break-all;
+  }
+  #pos-token-body table { width: 100%; }
+  #pos-token-body td { white-space: normal; }
+  .pos-token-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .pos-token-set { display: flex; gap: 6px; align-items: center; }
+  .erp-code-set { display: flex; gap: 6px; align-items: center; }
+  .erp-code-input { width: 130px; }
+  .muted { color: var(--muted); }
+  .erp-cart-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  /* 매장 검색창(store-mgmt-filter)도 erp-cart-filter와 같은 줄 배치를 재사용한다 -- 새 레이아웃을
+     또 만들지 않고 filterbar의 검색창(input[type="search"])과 같은 크기/스타일만 가져왔다. */
+  .erp-cart-filter input[type="search"] {
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+    width: 220px;
+  }
+  .erp-cart-filter input[type="search"]:focus { border-color: var(--blue); background: #fff; }
+  /* 상태를 한눈에 구분하려고 색을 나눈다 — 목록이 길어지면 글자만으로는 안 읽힌다. */
+  .erp-status { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+  .erp-status.pending { background: #fff5dc; color: #8a6100; }
+  .erp-status.loaded { background: var(--blue-soft, #eaf3ff); color: #1b64da; }
+  .erp-status.paid { background: #e8f8f1; color: #008b5a; }
+  .erp-status.failed, .erp-status.expired { background: #fff0f1; color: #d93025; }
+  .erp-status.dismissed, .erp-status.cancelled { background: #eef0f2; color: var(--muted); }
+  .pos-token-input {
+    width: 190px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    outline: none;
+    color: var(--ink);
+  }
+  .pos-token-input:focus { border-color: var(--blue); background: #fff; }
+  .testform {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+  .testform summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .testform-body { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .testform-body input, .testform-body select {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 12px;
+    font-size: 14px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+    border-radius: 10px;
+    outline: none;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  .testform-body input:focus, .testform-body select:focus { border-color: var(--blue); background: #fff; }
+  .testform-body button { flex: 0 0 auto; padding: 10px 18px; font-size: 14px; }
+  .testform-msg { font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .testform-msg.ok { color: var(--green); }
+  .testform-msg.err { color: var(--error); }
+</style>
+</head>
+<body>
+
+<div id="login-wrap">
+  <div id="login-card">
+    <h1>관리자 로그인</h1>
+    <p>이메일/비밀번호로 로그인하세요.</p>
+    <input type="email" id="email-input" placeholder="이메일" autocomplete="username" style="width:100%;padding:14px 16px;font-size:16px;background:var(--surface);border:1.5px solid transparent;border-radius:12px;outline:none;margin-bottom:10px;box-sizing:border-box;" />
+    <input type="password" id="password-input" placeholder="비밀번호" autocomplete="current-password" />
+    <div class="err" id="login-err"></div>
+    <button id="login-btn" style="width:100%">로그인</button>
+  </div>
+</div>
+
+<div class="top" id="top-bar" style="display:none">
+  <h1>쉐보레 포스모스 · 관리자</h1>
+  <div class="actions">
+    <select id="store-select" style="max-width:160px"></select>
+    <span class="status" id="conn-status"></span>
+    <button class="ghost" id="logout-btn">로그아웃</button>
+  </div>
+</div>
+
+<main id="main">
+  <details class="testform" id="store-add">
+    <summary>가맹점 관리 (본사) — 매장 등록</summary>
+    <div class="testform-body">
+      <input type="text" id="store-merchant-id" placeholder="merchantId (토스 SDK merchant.id)" />
+      <input type="text" id="store-name" placeholder="매장명" />
+      <input type="text" id="store-biz" placeholder="사업자번호 (선택)" />
+      <button id="store-add-btn">매장 등록</button>
+    </div>
+    <div class="testform-msg" id="store-add-msg"></div>
+  </details>
+
+  <details class="testform" id="store-admin-add">
+    <summary>가맹점 관리 (본사) — 매장 관리자 계정 발급</summary>
+    <div class="testform-body">
+      <input type="text" id="sa-merchant-id" placeholder="merchantId (등록된 매장)" />
+      <input type="email" id="sa-email" placeholder="이메일" />
+      <input type="password" id="sa-password" placeholder="비밀번호 (8자 이상)" />
+      <button id="sa-add-btn">계정 발급</button>
+    </div>
+    <div class="testform-msg" id="sa-add-msg"></div>
+  </details>
+
+  <details class="testform" id="pos-token-panel">
+    <summary>매장 개통 설정 (POS 토큰 · 전산 코드)</summary>
+    <p style="font-size:12px;color:var(--muted);margin:8px 2px 12px;">
+      <strong>POS 토큰</strong>은 POS 탭앱이 매장을 인증하는 값입니다. 외부에 노출되지 않도록 주의하세요.<br>
+      <strong>전산 코드</strong>는 쉐보레 전산이 이 매장을 부르는 이름(예: CHV-001)입니다.
+      전산은 매장을 이 코드로 지정하므로, 값이 없으면 그 매장으로는 전산 주문이 들어오지 못합니다.<br>
+      <strong>사업자번호</strong>를 채워두면 전산 코드를 손으로 넣지 않아도 됩니다 — 전산이 주문에
+      사업자번호를 함께 보내오면 서버가 매장을 찾아 코드를 자동으로 붙입니다.
+    </p>
+    <div class="erp-cart-filter" id="store-mgmt-filter" style="display:none">
+      <input type="search" id="store-search-input" placeholder="매장명 또는 merchantId 검색" />
+      <button class="row-btn" id="store-search-btn" type="button">검색</button>
+      <button class="row-btn" id="store-search-clear-btn" type="button">지우기</button>
+    </div>
+    <div id="pos-token-body"></div>
+  </details>
+
+  <details class="testform" id="password-panel">
+    <summary>내 비밀번호 변경</summary>
+    <p style="font-size:12px;color:var(--muted);margin:8px 2px 12px;">
+      비밀번호를 잊으면 스스로 복구할 방법이 없습니다(재설정 메일 기능이 없습니다).
+      정기적으로 바꾸시고, 잊지 않도록 안전한 곳에 보관하세요.
+    </p>
+    <div class="testform-body">
+      <input type="password" id="pw-current" placeholder="지금 쓰는 비밀번호" autocomplete="current-password" />
+      <input type="password" id="pw-new" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" />
+      <input type="password" id="pw-new2" placeholder="새 비밀번호 확인" autocomplete="new-password" />
+      <button id="pw-save">변경</button>
+    </div>
+    <div id="pw-msg" style="font-size:12px;margin-top:8px;"></div>
+  </details>
+
+  <details class="testform" id="erp-cart-panel">
+    <summary>전산 주문 이력</summary>
+    <p style="font-size:12px;color:var(--muted);margin:8px 2px 12px;">
+      쉐보레 전산이 보낸 주문이 어디까지 갔는지 확인합니다. 매장이 "전산에서 보냈는데 POS에
+      안 떴어요"라고 할 때 접수는 됐는지, POS가 가져갔는지, 실패했는지를 여기서 봅니다.
+    </p>
+    <div class="erp-cart-filter">
+      <select id="erp-cart-status">
+        <option value="">전체 상태</option>
+        <option value="pending">대기중 (POS가 아직 안 가져감)</option>
+        <option value="loaded">담김</option>
+        <option value="paid">결제완료</option>
+        <option value="failed">담기 실패</option>
+        <option value="dismissed">매장이 지움</option>
+        <option value="expired">만료됨</option>
+        <option value="cancelled">전산이 취소</option>
+      </select>
+      <button class="row-btn" id="erp-cart-reload" type="button">조회</button>
+    </div>
+    <div id="erp-cart-body"></div>
+  </details>
+
+  <div class="callnext">
+    <div id="callnext-info">대기중인 다음 손님을 호출하고 순서 알림을 보냅니다.</div>
+    <button id="callnext-btn">다음 손님 호출</button>
+  </div>
+
+  <details class="testform">
+    <summary>테스트 예약 생성 (실제 손님 예약과 동일하게 접수 알림이 발송됩니다)</summary>
+    <div class="testform-body">
+      <input type="text" id="test-car" placeholder="차량번호 (예: 12가3456)" maxlength="8" />
+      <select id="test-service"></select>
+      <input type="text" id="test-phone" placeholder="전화번호 (예: 01012345678)" maxlength="11" />
+      <button id="test-submit-btn">테스트 예약 등록</button>
+    </div>
+    <div class="testform-msg" id="test-msg"></div>
+  </details>
+
+  <div class="summary-card" id="summary-card"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="reservations">예약 (<span id="count-res">0</span>)</div>
+    <div class="tab" data-tab="payments">결제 (<span id="count-pay">0</span>)</div>
+  </div>
+
+  <div class="filterbar">
+    <label class="filter-label">날짜 <input type="date" id="date-filter" /></label>
+    <button class="ghost" id="date-all-btn" type="button">전체기간</button>
+    <select id="status-filter"></select>
+    <button class="ghost" id="failed-toggle-btn" type="button">발송실패만 보기</button>
+    <input type="search" id="search-input" placeholder="전화번호/차량번호 검색" />
+    <button class="ghost" id="search-btn" type="button">검색</button>
+    <button class="ghost" id="search-clear-btn" type="button">지우기</button>
+    <span class="filter-note" id="filter-note"></span>
+  </div>
+
+  <div class="section">
+    <div id="reservations-view"></div>
+    <div id="payments-view" style="display:none"></div>
+  </div>
+  <div class="refresh-note">15초마다 자동 새로고침됩니다.</div>
+</main>
+
+<script>
+const STATUS_LABEL = {
+  waiting: '대기중',
+  called: '호출완료',
+  notify_failed: '알림실패',
+  completed: '정비완료',
+  cancelled: '취소됨',
+  requested: '결제접수',
+  receipt_sent: '영수증발송',
+  receipt_failed: '영수증실패',
+}
+
+const PAGE_LIMIT = 100 // GET 목록 API의 기본 페이지 크기(서버 클램프 1~500)와 맞춘다.
+
+// server.js의 SERVICE_TYPES와 키를 맞춰야 한다.
+const SERVICE_TYPES = [
+  { value: 'oil', title: '엔진오일 교체' },
+  { value: 'inspection', title: '정기점검' },
+  { value: 'tire', title: '타이어 교체·펑크수리' },
+  { value: 'battery', title: '배터리 교체' },
+  { value: 'brake', title: '브레이크 정비' },
+  { value: 'etc', title: '기타 수리·상담' },
+]
+
+let token = sessionStorage.getItem('admin_token') || ''
+let adminRole = sessionStorage.getItem('admin_role') || ''
+let adminStoreId = sessionStorage.getItem('admin_store_id') || ''
+let myMerchantId = '' // store_admin 로그인 시 /api/admin/me로 채워짐 (테스트 예약용)
+let myStoreInfo = null // store_admin 로그인 시 /api/admin/me의 store 객체(posToken 포함)
+let currentTab = 'reservations'
+let pollTimer = null
+let stores = []
+let currentStoreId = '' // '' = 전체 매장(본사 뷰). store_admin은 항상 자기 storeId로 고정된다.
+// 매장 목록(드롭다운 + POS 토큰 관리 표가 같은 stores 배열을 공유한다) 페이지네이션/검색 상태.
+// 예약/결제 목록과 같은 이유(400개를 한 번에 그릴 수 없음)로 서버가 이제 페이지 단위로만 준다 --
+// 그래서 매장 선택 드롭다운도 "로드된 매장만" 보여준다. 찾는 매장이 안 보이면 검색하거나
+// 더 보기로 불러오면 된다(예약/결제 검색이 이미 이런 방식이라 새로운 동작 방식이 아니다).
+const STORE_PAGE_LIMIT = 100 // GET /api/admin/stores의 서버 클램프(1~500)와 같은 기준.
+let storesTotal = 0
+let storesHasMore = false
+let storeSearchQuery = ''
+
+// --- 목록 필터/페이지네이션 상태 ---
+// 서버가 이미 createdAt desc로 정렬해서 주므로 클라이언트에서는 절대 재정렬하지 않는다.
+let currentDateFilter = todayKST() // 'YYYY-MM-DD'. '' = 전체 기간
+let resStatusFilter = ''
+let payStatusFilter = ''
+let resViewMode = 'normal' // 'normal' | 'failed' (발송실패 화면 — GET /api/reservations/failed)
+let payViewMode = 'normal' // 'normal' | 'failed' (GET /api/payments/failed)
+let currentSearchQuery = '' // 손님 검색어(전화번호/차량번호 부분일치). 예약/결제 탭 공통 — 탭별로 따로 두지 않는다.
+let reservationsList = []
+let paymentsList = []
+let reservationsTotal = 0
+let paymentsTotal = 0
+let reservationsHasMore = false
+let paymentsHasMore = false
+
+function todayKST() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
+
+const loginWrap = document.getElementById('login-wrap')
+const topBar = document.getElementById('top-bar')
+const main = document.getElementById('main')
+const emailInput = document.getElementById('email-input')
+const passwordInput = document.getElementById('password-input')
+const loginBtn = document.getElementById('login-btn')
+const loginErr = document.getElementById('login-err')
+const logoutBtn = document.getElementById('logout-btn')
+const connStatus = document.getElementById('conn-status')
+const callnextBtn = document.getElementById('callnext-btn')
+const callnextInfo = document.getElementById('callnext-info')
+const testCarInput = document.getElementById('test-car')
+const testServiceSelect = document.getElementById('test-service')
+const testPhoneInput = document.getElementById('test-phone')
+const testSubmitBtn = document.getElementById('test-submit-btn')
+const testMsg = document.getElementById('test-msg')
+const storeSelect = document.getElementById('store-select')
+const storeMerchantIdInput = document.getElementById('store-merchant-id')
+const storeNameInput = document.getElementById('store-name')
+const storeBizInput = document.getElementById('store-biz')
+const storeAddBtn = document.getElementById('store-add-btn')
+const storeAddMsg = document.getElementById('store-add-msg')
+const storeAddPanel = document.getElementById('store-add')
+const storeAdminAddPanel = document.getElementById('store-admin-add')
+const saMerchantIdInput = document.getElementById('sa-merchant-id')
+const saEmailInput = document.getElementById('sa-email')
+const saPasswordInput = document.getElementById('sa-password')
+const saAddBtn = document.getElementById('sa-add-btn')
+const saAddMsg = document.getElementById('sa-add-msg')
+const dateFilterInput = document.getElementById('date-filter')
+const dateAllBtn = document.getElementById('date-all-btn')
+const statusFilterSelect = document.getElementById('status-filter')
+const failedToggleBtn = document.getElementById('failed-toggle-btn')
+const filterNote = document.getElementById('filter-note')
+const posTokenBody = document.getElementById('pos-token-body')
+const storeMgmtFilter = document.getElementById('store-mgmt-filter')
+const storeSearchInput = document.getElementById('store-search-input')
+const storeSearchBtn = document.getElementById('store-search-btn')
+const storeSearchClearBtn = document.getElementById('store-search-clear-btn')
+const searchInput = document.getElementById('search-input')
+const searchBtn = document.getElementById('search-btn')
+const searchClearBtn = document.getElementById('search-clear-btn')
+const summaryCard = document.getElementById('summary-card')
+
+dateFilterInput.value = currentDateFilter
+
+testServiceSelect.innerHTML = SERVICE_TYPES.map((s) => `<option value="${s.value}">${s.title}</option>`).join('')
+
+function fmtDate(iso) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtAmount(n) {
+  if (n === null || n === undefined) return '-'
+  return Number(n).toLocaleString('ko-KR') + '원'
+}
+
+async function api(path) {
+  const res = await fetch(path, { headers: { authorization: 'Bearer ' + token } })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (!res.ok) throw new Error('요청 실패 (' + res.status + ')')
+  return res.json()
+}
+
+async function apiPost(path, method = 'POST') {
+  const res = await fetch(path, { method, headers: { authorization: 'Bearer ' + token } })
+  const body = await res.json().catch(() => ({}))
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  return { ok: res.ok, status: res.status, body }
+}
+
+async function showApp() {
+  loginWrap.style.display = 'none'
+  topBar.style.display = 'flex'
+  main.style.display = 'block'
+
+  const isHq = adminRole === 'hq_admin'
+  storeAddPanel.style.display = isHq ? '' : 'none'
+  storeAdminAddPanel.style.display = isHq ? '' : 'none'
+  // store_admin은 매장이 자기 것 하나뿐이라 검색/더보기가 필요 없다(renderPosTokens의 else 분기).
+  storeMgmtFilter.style.display = isHq ? '' : 'none'
+
+  if (isHq) {
+    await loadStores()
+  } else {
+    // store_admin: 매장 선택 UI 자체가 필요 없다 — 항상 자기 매장으로 고정.
+    currentStoreId = adminStoreId
+    storeSelect.style.display = 'none'
+    const me = await api('/api/admin/me')
+    myMerchantId = me.store?.merchantId || ''
+    myStoreInfo = me.store || null
+    renderPosTokens()
+  }
+
+  renderStatusOptions()
+  await loadAll({ mode: 'reset' })
+  if (pollTimer) clearInterval(pollTimer)
+  // 15초마다 폴링하되, 'refresh' 모드는 이미 로드된 페이지 크기만큼만 다시 받아온다
+  // (필터가 바뀐 게 아니므로 "더 보기"로 불러온 뒷페이지까지 매번 새로 긁어오지 않는다).
+  pollTimer = setInterval(() => loadAll({ mode: 'refresh' }), 15000)
+}
+
+// mode: 'reset' -- 검색어 변경/최초 진입 등으로 offset 0부터 다시 불러온다(기존 목록 교체).
+// mode: 'append' -- "더 보기"로 다음 페이지를 이어붙인다.
+async function loadStores({ mode = 'reset' } = {}) {
+  const offset = mode === 'append' ? stores.length : 0
+  const params = new URLSearchParams()
+  params.set('limit', String(STORE_PAGE_LIMIT))
+  params.set('offset', String(offset))
+  if (storeSearchQuery) params.set('q', storeSearchQuery)
+  try {
+    const data = await api(`/api/admin/stores?${params.toString()}`)
+    const items = data.stores || []
+    stores = mode === 'append' ? stores.concat(items) : items
+    storesTotal = data.total || 0
+    storesHasMore = !!data.hasMore
+  } catch (e) {
+    if (mode !== 'append') {
+      stores = []
+      storesTotal = 0
+      storesHasMore = false
+    }
+  }
+  renderStoreSelect()
+  renderPosTokens()
+}
+
+function statusOptionsFor(kind) {
+  if (kind === 'reservations') {
+    return [
+      ['', '전체 상태'],
+      ['waiting', '대기중'],
+      ['called', '호출완료'],
+      ['completed', '정비완료'],
+      ['cancelled', '취소됨'],
+      ['notify_failed', '알림실패'],
+    ]
+  }
+  return [
+    ['', '전체 상태'],
+    ['requested', '결제접수'],
+    ['receipt_sent', '영수증발송'],
+    ['receipt_failed', '영수증실패'],
+    ['cancelled', '취소됨'],
+  ]
+}
+
+function renderStatusOptions() {
+  const opts = statusOptionsFor(currentTab)
+  statusFilterSelect.innerHTML = opts.map(([v, label]) => `<option value="${v}">${label}</option>`).join('')
+  statusFilterSelect.value = currentTab === 'reservations' ? resStatusFilter : payStatusFilter
+  const vm = currentTab === 'reservations' ? resViewMode : payViewMode
+  statusFilterSelect.disabled = vm === 'failed'
+  failedToggleBtn.classList.toggle('active', vm === 'failed')
+  failedToggleBtn.textContent = vm === 'failed' ? '전체 보기로 전환' : '발송실패만 보기'
+}
+
+function updateFilterNote() {
+  const parts = []
+  parts.push(currentDateFilter ? `날짜: ${currentDateFilter}` : '전체 기간')
+  const sf = currentTab === 'reservations' ? resStatusFilter : payStatusFilter
+  const vm = currentTab === 'reservations' ? resViewMode : payViewMode
+  if (vm === 'failed') parts.push(currentTab === 'reservations' ? '알림실패만' : '영수증실패만')
+  else if (sf) parts.push(`상태: ${STATUS_LABEL[sf] || sf}`)
+  if (currentSearchQuery) parts.push(`검색: ${currentSearchQuery}`)
+  filterNote.textContent = parts.join(' · ')
+}
+
+// 검색어는 예약/결제 탭에 공통 적용되고, offset 0부터 다시 불러온다(loadAll reset).
+function runSearch() {
+  currentSearchQuery = searchInput.value.trim()
+  loadAll({ mode: 'reset' })
+}
+
+searchBtn.addEventListener('click', runSearch)
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    runSearch()
+  }
+})
+searchClearBtn.addEventListener('click', () => {
+  currentSearchQuery = ''
+  searchInput.value = ''
+  loadAll({ mode: 'reset' })
+})
+
+dateFilterInput.addEventListener('change', () => {
+  currentDateFilter = dateFilterInput.value || ''
+  loadAll({ mode: 'reset' })
+})
+
+dateAllBtn.addEventListener('click', () => {
+  currentDateFilter = ''
+  dateFilterInput.value = ''
+  loadAll({ mode: 'reset' })
+})
+
+statusFilterSelect.addEventListener('change', () => {
+  if (currentTab === 'reservations') resStatusFilter = statusFilterSelect.value
+  else payStatusFilter = statusFilterSelect.value
+  loadAll({ mode: 'reset' })
+})
+
+failedToggleBtn.addEventListener('click', () => {
+  if (currentTab === 'reservations') resViewMode = resViewMode === 'failed' ? 'normal' : 'failed'
+  else payViewMode = payViewMode === 'failed' ? 'normal' : 'failed'
+  renderStatusOptions()
+  loadAll({ mode: 'reset' })
+})
+
+// --- 내 비밀번호 변경 ---
+const pwMsg = document.getElementById('pw-msg')
+const pwSave = document.getElementById('pw-save')
+
+if (pwSave) {
+  pwSave.addEventListener('click', async () => {
+    const current = document.getElementById('pw-current').value
+    const next = document.getElementById('pw-new').value
+    const confirm2 = document.getElementById('pw-new2').value
+    pwMsg.style.color = 'var(--red, #d93025)'
+
+    // 오타로 자기 계정을 잠그는 사고를 막으려고 확인란을 둔다 — 재설정 경로가 없어서
+    // 새 비밀번호를 잘못 넣으면 DB를 직접 고쳐야 한다.
+    if (next !== confirm2) { pwMsg.textContent = '새 비밀번호가 서로 다릅니다.'; return }
+    if (next.length < 8) { pwMsg.textContent = '새 비밀번호는 8자 이상이어야 합니다.'; return }
+
+    pwSave.disabled = true
+    try {
+      const res = await fetch('/api/admin/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        pwMsg.textContent = body.error || '변경하지 못했습니다.'
+        return
+      }
+      pwMsg.style.color = 'var(--green, #0f9d58)'
+      pwMsg.textContent = '변경했습니다. 다음 로그인부터 새 비밀번호를 쓰세요.'
+      document.getElementById('pw-current').value = ''
+      document.getElementById('pw-new').value = ''
+      document.getElementById('pw-new2').value = ''
+    } catch (err) {
+      pwMsg.textContent = '요청 중 오류가 발생했습니다.'
+    } finally {
+      pwSave.disabled = false
+    }
+  })
+}
+
+// --- 전산 주문 이력 ---
+// 펼쳤을 때만 불러온다. 목록이 길고 자주 볼 화면이 아니라 로그인할 때마다 받아올 이유가 없다.
+const erpCartBody = document.getElementById('erp-cart-body')
+const erpCartPanel = document.getElementById('erp-cart-panel')
+const erpCartStatus = document.getElementById('erp-cart-status')
+const erpCartReload = document.getElementById('erp-cart-reload')
+
+const ERP_STATUS_LABEL = {
+  pending: '대기중', loaded: '담김', paid: '결제완료',
+  failed: '담기 실패', dismissed: '매장이 지움', expired: '만료됨', cancelled: '전산이 취소',
+}
+
+function formatWhen(v) {
+  if (!v) return '-'
+  const d = new Date(v)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ` +
+         `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// 서버 기본 페이지 크기(listErpCarts limit=50, 최대 200)와 맞춘다. pending/failed 건이 이 값을
+// 넘으면 예전엔 오래된 문제 건이 화면에서 조용히 사라져 "이 매장엔 문제가 없다"고 오판하게
+// 됐다 -- 이제 total/hasMore로 "더 있는지"를 알 수 있으니 더보기 버튼을 붙인다.
+const ERP_CART_PAGE_LIMIT = 50
+let erpCartsList = []
+let erpCartsTotal = 0
+let erpCartsHasMore = false
+
+function renderErpCarts() {
+  if (!erpCartsList.length) {
+    erpCartBody.innerHTML = '<div class="empty">해당하는 전산 주문이 없습니다.</div>'
+    return
+  }
+  erpCartBody.innerHTML = `<table>
+      <thead><tr>
+        <th>접수</th><th>참조번호</th><th>매장</th><th>차량</th>
+        <th>금액</th><th>상태</th><th>담김/결제</th>
+      </tr></thead>
+      <tbody>${erpCartsList.map((c) => `<tr>
+        <td>${escapeHtml(formatWhen(c.createdAt))}</td>
+        <td><code>${escapeHtml(c.referenceId)}</code><br>
+            <span class="muted">${c.itemCount}개 품목</span></td>
+        <td>${escapeHtml(c.storeName || '-')}<br>
+            <span class="muted">${escapeHtml(c.erpStoreCode || '')}</span></td>
+        <td>${escapeHtml(c.carNumber || '-')}
+            ${c.linkedReservation ? '<br><span class="muted">예약 연결됨</span>' : ''}</td>
+        <td>${Number(c.totalAmount).toLocaleString('ko-KR')}원</td>
+        <td><span class="erp-status ${escapeHtml(c.status)}">${escapeHtml(ERP_STATUS_LABEL[c.status] || c.status)}</span>
+            ${c.errorMessage ? `<br><span class="muted">${escapeHtml(c.errorMessage)}</span>` : ''}</td>
+        <td>${escapeHtml(formatWhen(c.loadedAt))}<br>
+            <span class="muted">${escapeHtml(formatWhen(c.paidAt))}</span></td>
+      </tr>`).join('')}</tbody>
+    </table>${erpCartsHasMore ? '<div class="load-more-wrap"><button class="row-btn load-more" id="erp-cart-load-more" type="button">더 보기 (' + erpCartsList.length + ' / ' + erpCartsTotal + ')</button></div>' : ''}`
+}
+
+// mode: 'reset' -- 조회/필터 변경 시 offset 0부터 다시 불러온다.
+// mode: 'append' -- "더 보기"로 다음 페이지를 이어붙인다.
+async function loadErpCarts({ mode = 'reset' } = {}) {
+  if (mode !== 'append') erpCartBody.innerHTML = '<div class="empty">불러오는 중...</div>'
+  const offset = mode === 'append' ? erpCartsList.length : 0
+  const params = new URLSearchParams()
+  if (erpCartStatus.value) params.set('status', erpCartStatus.value)
+  // 본사 관리자가 상단에서 특정 매장을 고른 상태면 그 매장만 본다(currentStoreId, '' = 전체).
+  if (adminRole === 'hq_admin' && currentStoreId) params.set('storeId', currentStoreId)
+  params.set('limit', String(ERP_CART_PAGE_LIMIT))
+  params.set('offset', String(offset))
+  try {
+    const res = await fetch(`/api/admin/erp-carts?${params.toString()}`, {
+      headers: { authorization: 'Bearer ' + token },
+    })
+    if (res.status === 401) {
+      clearSession()
+      showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+      return
+    }
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      erpCartBody.innerHTML = `<div class="empty">${escapeHtml(body.error || '불러오지 못했습니다.')}</div>`
+      return
+    }
+    erpCartsList = mode === 'append' ? erpCartsList.concat(body.carts) : body.carts
+    erpCartsTotal = body.total || 0
+    erpCartsHasMore = !!body.hasMore
+    renderErpCarts()
+  } catch (err) {
+    erpCartBody.innerHTML = '<div class="empty">요청 중 오류가 발생했습니다.</div>'
+  }
+}
+
+erpCartBody.addEventListener('click', (e) => {
+  if (e.target.id === 'erp-cart-load-more') loadErpCarts({ mode: 'append' })
+})
+
+if (erpCartPanel) {
+  erpCartPanel.addEventListener('toggle', () => { if (erpCartPanel.open) loadErpCarts() })
+  erpCartReload.addEventListener('click', () => loadErpCarts())
+  erpCartStatus.addEventListener('change', () => loadErpCarts())
+}
+
+// --- POS 토큰 관리 (본사는 전체 매장, 매장관리자는 자기 매장만) ---
+function maskedToken() {
+  return '•'.repeat(12)
+}
+
+// 전산 코드 칸.
+// 쉐보레 전산은 매장을 자기네 코드(예: CHV-001)로 부르고 토스는 merchantId로 부른다. 전산이
+// 보낸 주문이 어느 매장 것인지 알려면 그 둘을 이어주는 값이 필요한데, 그게 이 코드다
+// (docs/전산-POS-장바구니-연동설계.md §6). 값이 없으면 전산 요청은 404로 거부된다.
+// POS 토큰과 나란히 두는 이유: 둘 다 "매장 하나를 개통할 때 본사가 채워주는 값"이라 같은
+// 자리에서 한 번에 처리하는 게 실수가 적다.
+function erpCodeCell(erpStoreCode, editable) {
+  const value = erpStoreCode || ''
+  if (!editable) {
+    return `<td>${value ? `<code>${escapeHtml(value)}</code>` : '<span class="muted">미지정</span>'}</td>`
+  }
+  return `<td>
+    <div class="erp-code-set">
+      <input type="text" class="erp-code-input" value="${escapeHtml(value)}" placeholder="예: CHV-001"
+             maxlength="64" autocomplete="off" spellcheck="false" />
+      <button class="row-btn erp-code-save" type="button">저장</button>
+    </div>
+  </td>`
+}
+
+// 사업자번호 칸.
+// 전산이 storeCode와 함께 사업자번호를 보내면 서버가 이 값으로 매장을 찾아 전산 코드를 자동으로
+// 붙여준다(서버의 resolveErpStore). 그러려면 이 값이 먼저 채워져 있어야 하는데, 지금까지는
+// 매장 등록 화면에서만 받아서 이미 등록된 매장은 고칠 방법이 없었다.
+function businessNumberCell(businessNumber, editable) {
+  const value = businessNumber || ''
+  if (!editable) {
+    return `<td>${value ? escapeHtml(value) : '<span class="muted">미지정</span>'}</td>`
+  }
+  return `<td>
+    <div class="erp-code-set">
+      <input type="text" class="biz-number-input" value="${escapeHtml(value)}" placeholder="123-45-67890"
+             maxlength="20" autocomplete="off" spellcheck="false" />
+      <button class="row-btn biz-number-save" type="button">저장</button>
+    </div>
+  </td>`
+}
+
+// posToken: 이미 값을 아는 경우에만 채워서 넘긴다(store_admin 자기 매장, 또는 hq_admin이
+// 한 번 "보기"/"복사"로 이미 받아온 매장). hasToken: 목록 응답의 hasPosToken -- 값 자체는
+// 없지만 토큰이 있기는 한지(빈 매장과 구분)는 알아야 "(없음)"과 "불러와야 함"을 구분할 수 있다.
+function posTokenRow(storeId, name, merchantId, posToken, hasToken, canRegen, erpStoreCode, businessNumber) {
+  return `<tr data-store-id="${escapeHtml(storeId)}">
+    <td>${escapeHtml(name)}</td>
+    <td>${escapeHtml(merchantId)}</td>
+    ${businessNumberCell(businessNumber, canRegen)}
+    ${erpCodeCell(erpStoreCode, canRegen)}
+    <td>
+      <code class="pos-token-value" data-token="${escapeHtml(posToken || '')}" data-visible="false" data-has-token="${hasToken ? 'true' : 'false'}">${maskedToken()}</code>
+      <button class="row-btn pos-token-toggle" type="button">보기</button>
+      <button class="row-btn pos-token-copy" type="button">복사</button>
+    </td>
+    <td>${canRegen ? `
+      <div class="pos-token-actions">
+        <button class="row-btn pos-token-regen" type="button">무작위 재발급</button>
+        <!--
+          직접 지정: 무작위 64자 hex는 안전하지만 POS 단말기에서 손으로 입력하기가 사실상 불가능해서,
+          매장에 불러주거나 적어 전달할 수 있는 값을 관리자가 정할 수 있게 한다.
+          단 이 값이 곧 POS API의 비밀번호이므로 서버가 길이/문자/단순함을 강제한다(400으로 거부).
+        -->
+        <div class="pos-token-set">
+          <input type="text" class="pos-token-input" placeholder="직접 지정 (4자 이상)" maxlength="128" autocomplete="off" spellcheck="false" />
+          <button class="row-btn pos-token-save" type="button">저장</button>
+        </div>
+      </div>` : ''}</td>
+  </tr>`
+}
+
+function renderPosTokens() {
+  if (adminRole === 'hq_admin') {
+    if (!stores.length) {
+      posTokenBody.innerHTML = storeSearchQuery
+        ? '<div class="empty">검색 결과가 없습니다.</div>'
+        : '<div class="empty">등록된 매장이 없습니다.</div>'
+      return
+    }
+    posTokenBody.innerHTML = `<table>
+      <thead><tr><th>매장</th><th>merchantId</th><th>사업자번호</th><th>전산 코드</th><th>POS 토큰</th><th>동작</th></tr></thead>
+      <tbody>${stores.map(s => posTokenRow(s.id, s.name, s.merchantId, s.posToken, s.hasPosToken, true, s.erpStoreCode, s.businessNumber)).join('')}</tbody>
+    </table>${storesHasMore ? '<div class="load-more-wrap"><button class="row-btn load-more" id="store-load-more" type="button">더 보기 (' + stores.length + ' / ' + storesTotal + ')</button></div>' : ''}`
+  } else {
+    if (!myStoreInfo) {
+      posTokenBody.innerHTML = '<div class="empty">매장 정보를 불러오지 못했습니다.</div>'
+      return
+    }
+    // store_admin은 토큰 재발급/전산 코드 지정 권한이 없다(둘 다 hq 전용 엔드포인트) —
+    // 버튼 대신 현재 값만 보여준다. /api/admin/me가 이미 실제 토큰 값을 포함해 주므로
+    // (자기 매장뿐이라 안전) hq_admin 목록처럼 따로 불러올 필요가 없다.
+    posTokenBody.innerHTML = `<table>
+      <tbody>${posTokenRow(myStoreInfo.id, myStoreInfo.name, myStoreInfo.merchantId, myStoreInfo.posToken, Boolean(myStoreInfo.posToken), false, myStoreInfo.erpStoreCode, myStoreInfo.businessNumber)}</tbody>
+    </table>`
+  }
+}
+
+// 목록 응답엔 posToken 값 자체가 없다(hasPosToken만 있음) -- "보기"/"복사"를 처음 누르는
+// 순간에만 단건 조회로 실제 값을 받아 캐시한다. 이미 받아온 적 있으면(codeEl.dataset.token
+// 또는 stores 배열의 값) 다시 요청하지 않는다.
+async function ensurePosTokenLoaded(tr, storeId, codeEl) {
+  if (codeEl.dataset.token) return codeEl.dataset.token
+  if (codeEl.dataset.hasToken !== 'true') return ''
+  const data = await api(`/api/admin/stores/${storeId}/pos-token`)
+  const value = data.posToken || ''
+  codeEl.dataset.token = value
+  const store = stores.find(s => s.id === storeId)
+  if (store) store.posToken = value
+  return value
+}
+
+posTokenBody.addEventListener('click', async (e) => {
+  if (e.target.id === 'store-load-more') {
+    await loadStores({ mode: 'append' })
+    return
+  }
+
+  const tr = e.target.closest('tr')
+  if (!tr) return
+  const storeId = tr.dataset.storeId
+  const codeEl = tr.querySelector('.pos-token-value')
+
+  if (e.target.classList.contains('pos-token-toggle')) {
+    const visible = codeEl.dataset.visible === 'true'
+    if (visible) {
+      codeEl.textContent = maskedToken()
+      codeEl.dataset.visible = 'false'
+      e.target.textContent = '보기'
+      return
+    }
+    e.target.disabled = true
+    try {
+      const value = await ensurePosTokenLoaded(tr, storeId, codeEl)
+      codeEl.textContent = value || '(없음)'
+      codeEl.dataset.visible = 'true'
+      e.target.textContent = '숨기기'
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('토큰을 불러오지 못했습니다.')
+    } finally {
+      e.target.disabled = false
+    }
+    return
+  }
+
+  if (e.target.classList.contains('pos-token-copy')) {
+    e.target.disabled = true
+    let tokenVal
+    try {
+      tokenVal = await ensurePosTokenLoaded(tr, storeId, codeEl)
+    } catch (err) {
+      e.target.disabled = false
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('토큰을 불러오지 못했습니다.')
+      return
+    }
+    e.target.disabled = false
+    if (!tokenVal) return
+    try {
+      await navigator.clipboard.writeText(tokenVal)
+      const original = e.target.textContent
+      e.target.textContent = '복사됨'
+      setTimeout(() => { e.target.textContent = original }, 1500)
+    } catch (err) {
+      alert('클립보드 복사에 실패했습니다. 토큰을 직접 선택해 복사해주세요.')
+    }
+    return
+  }
+
+  if (e.target.classList.contains('biz-number-save')) {
+    const input = tr.querySelector('.biz-number-input')
+    const raw = (input?.value || '').trim()
+    e.target.disabled = true
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/business-number`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ businessNumber: raw }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 401) {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      if (!res.ok || !body.ok) {
+        alert(body.error || '사업자번호 저장에 실패했습니다.')
+        return
+      }
+      // 서버가 하이픈 표기로 정규화해서 돌려주므로 화면도 그 값으로 맞춘다 — 사용자가 하이픈 없이
+      // 입력했을 때 저장된 형태를 바로 보여주는 편이 헷갈리지 않는다.
+      if (input) input.value = body.businessNumber || ''
+      const store = stores.find(s => s.id === storeId)
+      if (store) store.businessNumber = body.businessNumber
+      const original = e.target.textContent
+      e.target.textContent = '저장됨'
+      setTimeout(() => { e.target.textContent = original }, 1500)
+    } catch (err) {
+      alert('요청 중 오류가 발생했습니다.')
+    } finally {
+      e.target.disabled = false
+    }
+    return
+  }
+
+  if (e.target.classList.contains('erp-code-save')) {
+    const input = tr.querySelector('.erp-code-input')
+    const code = (input?.value || '').trim()
+    // 빈 값으로 저장하면 서버가 매핑을 해제한다(null). 지우는 것도 정상 동작이라 막지 않되,
+    // 실수로 지우는 건 되돌리기가 번거로우니 한 번 확인한다 — 해제되면 그 매장으로는 전산
+    // 주문이 더 이상 들어오지 못한다.
+    if (!code && !confirm('전산 코드를 지우면 이 매장으로는 전산 주문을 받을 수 없습니다. 계속할까요?')) return
+    e.target.disabled = true
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/erp-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify({ erpStoreCode: code }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 401) {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      if (!res.ok || !body.ok) {
+        // 형식 위반은 400, 다른 매장이 이미 쓰는 코드면 409로 사유가 온다.
+        alert(body.error || '전산 코드 저장에 실패했습니다.')
+        return
+      }
+      const store = stores.find(s => s.id === storeId)
+      if (store) store.erpStoreCode = body.erpStoreCode
+      const original = e.target.textContent
+      e.target.textContent = '저장됨'
+      setTimeout(() => { e.target.textContent = original }, 1500)
+    } catch (err) {
+      alert('요청 중 오류가 발생했습니다.')
+    } finally {
+      e.target.disabled = false
+    }
+    return
+  }
+
+  // 무작위 재발급과 직접 지정은 같은 엔드포인트를 쓴다 — body에 posToken이 있으면 그 값으로,
+  // 없으면 서버가 무작위로 발급한다. 둘 다 기존 토큰을 즉시 무효화하므로 확인 문구는 공유한다.
+  const isRegen = e.target.classList.contains('pos-token-regen')
+  const isSave = e.target.classList.contains('pos-token-save')
+  if (isRegen || isSave) {
+    let customToken = null
+    if (isSave) {
+      const input = tr.querySelector('.pos-token-input')
+      customToken = (input?.value || '').trim()
+      if (!customToken) {
+        alert('지정할 토큰 값을 입력해주세요.')
+        return
+      }
+    }
+    if (!confirm('토큰을 바꾸면 기존 POS 단말기에 등록된 토큰은 즉시 무효화됩니다. POS 탭앱에서 토큰을 다시 입력해야 합니다. 계속할까요?')) return
+    e.target.disabled = true
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/pos-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify(customToken ? { posToken: customToken } : {}),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 401) {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      if (!res.ok || !body.ok) {
+        // 서버가 길이/문자/단순함 위반은 400, 다른 매장이 쓰는 값이면 409로 사유를 돌려준다.
+        alert(body.error || (isSave ? '토큰 지정에 실패했습니다.' : '재발급에 실패했습니다.'))
+        return
+      }
+      const store = stores.find(s => s.id === storeId)
+      if (store) store.posToken = body.posToken
+      if (myStoreInfo && myStoreInfo.id === storeId) myStoreInfo.posToken = body.posToken
+      renderPosTokens()
+    } catch (err) {
+      alert('요청 중 오류가 발생했습니다.')
+    } finally {
+      e.target.disabled = false
+    }
+  }
+})
+
+function renderStoreSelect() {
+  const options = ['<option value="">전체 매장</option>']
+    .concat(stores.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`))
+  storeSelect.innerHTML = options.join('')
+  storeSelect.value = currentStoreId
+}
+
+storeSelect.addEventListener('change', () => {
+  currentStoreId = storeSelect.value
+  loadAll({ mode: 'reset' })
+})
+
+// 매장 검색(본사 전용) -- 예약/결제 검색(searchInput/searchBtn)과 같은 방식이다.
+function runStoreSearch() {
+  storeSearchQuery = storeSearchInput.value.trim()
+  loadStores({ mode: 'reset' })
+}
+storeSearchBtn.addEventListener('click', runStoreSearch)
+storeSearchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    runStoreSearch()
+  }
+})
+storeSearchClearBtn.addEventListener('click', () => {
+  storeSearchQuery = ''
+  storeSearchInput.value = ''
+  loadStores({ mode: 'reset' })
+})
+
+storeAddBtn.addEventListener('click', async () => {
+  const merchantId = storeMerchantIdInput.value.trim()
+  const name = storeNameInput.value.trim()
+  const businessNumber = storeBizInput.value.trim()
+  storeAddMsg.textContent = ''
+  storeAddMsg.className = 'testform-msg'
+  if (!merchantId || !name) {
+    storeAddMsg.textContent = 'merchantId와 매장명은 필수입니다.'
+    storeAddMsg.className = 'testform-msg err'
+    return
+  }
+  storeAddBtn.disabled = true
+  try {
+    const res = await fetch('/api/admin/stores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+      body: JSON.stringify({ merchantId, name, businessNumber }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      storeAddMsg.textContent = body.error || '등록 실패'
+      storeAddMsg.className = 'testform-msg err'
+      return
+    }
+    // 등록 응답에 posToken이 포함되므로 등록 직후 화면에 바로 보여준다(POS 탭앱에 입력해야 하는 값).
+    storeAddMsg.innerHTML = `등록 완료: ${escapeHtml(body.store.name)} · POS 토큰: <code class="pos-token-value">${escapeHtml(body.store.posToken || '(발급 안됨)')}</code>`
+    storeAddMsg.className = 'testform-msg ok'
+    storeMerchantIdInput.value = ''
+    storeNameInput.value = ''
+    storeBizInput.value = ''
+    await loadStores()
+  } catch (e) {
+    storeAddMsg.textContent = '요청 중 오류가 발생했습니다.'
+    storeAddMsg.className = 'testform-msg err'
+  } finally {
+    storeAddBtn.disabled = false
+  }
+})
+
+function showLogin(message) {
+  loginWrap.style.display = 'flex'
+  topBar.style.display = 'none'
+  main.style.display = 'none'
+  if (pollTimer) clearInterval(pollTimer)
+  if (message) loginErr.textContent = message
+}
+
+function persistSession() {
+  sessionStorage.setItem('admin_token', token)
+  sessionStorage.setItem('admin_role', adminRole)
+  sessionStorage.setItem('admin_store_id', adminStoreId || '')
+}
+
+function clearSession() {
+  sessionStorage.removeItem('admin_token')
+  sessionStorage.removeItem('admin_role')
+  sessionStorage.removeItem('admin_store_id')
+  token = ''
+  adminRole = ''
+  adminStoreId = ''
+}
+
+async function loginWithCredentials(email, password) {
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      // 423(계정 잠금 — 비밀번호 5회 실패)도 res.ok=false로 잡히므로 서버가 내려준
+      // body.error 문구("15분 후 다시 시도해주세요.")를 그대로 보여주면 된다. 상태코드별
+      // 분기가 따로 필요 없다.
+      clearSession()
+      showLogin(body.error || '로그인에 실패했습니다.')
+      return
+    }
+    token = body.token
+    adminRole = body.role
+    adminStoreId = body.storeId || ''
+    persistSession()
+    loginErr.textContent = ''
+    showApp()
+  } catch (e) {
+    clearSession()
+    showLogin('로그인 중 오류가 발생했습니다.')
+  }
+}
+
+async function tryResumeSession() {
+  try {
+    await api('/api/admin/me')
+    showApp()
+  } catch (e) {
+    clearSession()
+    showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+  }
+}
+
+loginBtn.addEventListener('click', () => {
+  const email = emailInput.value.trim()
+  const password = passwordInput.value
+  if (!email || !password) return
+  loginWithCredentials(email, password)
+})
+passwordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') loginBtn.click()
+})
+logoutBtn.addEventListener('click', () => {
+  clearSession()
+  showLogin('')
+})
+
+saAddBtn.addEventListener('click', async () => {
+  const merchantId = saMerchantIdInput.value.trim()
+  const email = saEmailInput.value.trim()
+  const password = saPasswordInput.value
+  saAddMsg.textContent = ''
+  saAddMsg.className = 'testform-msg'
+  if (!merchantId || !email || !password) {
+    saAddMsg.textContent = 'merchantId/이메일/비밀번호는 필수입니다.'
+    saAddMsg.className = 'testform-msg err'
+    return
+  }
+  saAddBtn.disabled = true
+  try {
+    const res = await fetch('/api/admin/store-admins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', authorization: 'Bearer ' + token },
+      body: JSON.stringify({ merchantId, email, password }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      saAddMsg.textContent = body.error || '발급 실패'
+      saAddMsg.className = 'testform-msg err'
+      return
+    }
+    saAddMsg.textContent = `발급 완료: ${body.admin.email}`
+    saAddMsg.className = 'testform-msg ok'
+    saMerchantIdInput.value = ''
+    saEmailInput.value = ''
+    saPasswordInput.value = ''
+  } catch (e) {
+    saAddMsg.textContent = '요청 중 오류가 발생했습니다.'
+    saAddMsg.className = 'testform-msg err'
+  } finally {
+    saAddBtn.disabled = false
+  }
+})
+
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'))
+    tab.classList.add('active')
+    currentTab = tab.dataset.tab
+    document.getElementById('reservations-view').style.display = currentTab === 'reservations' ? 'block' : 'none'
+    document.getElementById('payments-view').style.display = currentTab === 'payments' ? 'block' : 'none'
+    renderStatusOptions()
+    updateFilterNote()
+  })
+})
+
+document.getElementById('reservations-view').addEventListener('click', async (e) => {
+  if (e.target.id === 'res-load-more') {
+    await loadMore('reservations')
+    return
+  }
+
+  const btn = e.target.closest('.row-btn')
+  if (!btn || btn.disabled) return
+  const id = btn.dataset.id
+
+  if (btn.classList.contains('call')) {
+    btn.disabled = true
+    btn.textContent = '호출중...'
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}/call`)
+      if (!ok) alert(body.error || '호출에 실패했습니다.')
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('호출 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+    return
+  }
+
+  if (btn.classList.contains('complete')) {
+    btn.disabled = true
+    btn.textContent = '처리중...'
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}/complete`)
+      if (!ok) alert(body.error || '처리에 실패했습니다.')
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('처리 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+    return
+  }
+
+  if (btn.classList.contains('cancel')) {
+    if (!confirm('이 예약을 취소할까요?')) return
+    btn.disabled = true
+    btn.textContent = '취소중...'
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}/cancel`)
+      if (!ok) alert(body.error || '취소에 실패했습니다.')
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('취소 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+    return
+  }
+
+  if (btn.classList.contains('retry')) {
+    btn.disabled = true
+    btn.textContent = '재발송중...'
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}/retry-notify`)
+      if (!ok) {
+        alert(body.error || '재발송 요청에 실패했습니다.')
+      } else if (body.sent === false) {
+        // HTTP 200이지만 sent:false — 재발송 자체는 실행됐고 다시 실패했다는 뜻이다.
+        alert('알림톡을 재발송했지만 다시 실패했습니다. 잠시 후 다시 시도해주세요.')
+      } else {
+        alert('알림톡이 재발송되었습니다.')
+      }
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('재발송 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+    return
+  }
+
+  if (btn.classList.contains('retry-intake')) {
+    btn.disabled = true
+    btn.textContent = '재발송중...'
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}/retry-intake`)
+      if (!ok) {
+        alert(body.error || '재발송 요청에 실패했습니다.')
+      } else if (body.sent === false) {
+        // retry-notify와 동일한 패턴 — HTTP 200 + sent:false는 재발송을 시도했지만 다시 실패했다는 뜻.
+        alert('접수 알림톡을 재발송했지만 다시 실패했습니다. 잠시 후 다시 시도해주세요.')
+      } else {
+        alert('접수 알림톡이 재발송되었습니다.')
+      }
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('재발송 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+    return
+  }
+
+  if (btn.classList.contains('del')) {
+    if (!confirm('이 예약을 삭제할까요?')) return
+    btn.disabled = true
+    try {
+      const { ok, body } = await apiPost(`/api/reservations/${id}`, 'DELETE')
+      if (!ok) alert(body.error || '삭제에 실패했습니다.')
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+  }
+})
+
+document.getElementById('payments-view').addEventListener('click', async (e) => {
+  if (e.target.id === 'pay-load-more') {
+    await loadMore('payments')
+    return
+  }
+
+  const btn = e.target.closest('.row-btn')
+  if (!btn || btn.disabled) return
+  const id = btn.dataset.id
+
+  if (btn.classList.contains('retry')) {
+    btn.disabled = true
+    btn.textContent = '재발송중...'
+    try {
+      const { ok, body } = await apiPost(`/api/payments/${id}/retry-receipt`)
+      if (!ok) {
+        alert(body.error || '재발송 요청에 실패했습니다.')
+      } else if (body.sent === false) {
+        alert('전자영수증을 재발송했지만 다시 실패했습니다. 잠시 후 다시 시도해주세요.')
+      } else {
+        alert('전자영수증이 재발송되었습니다.')
+      }
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') {
+        clearSession()
+        showLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+        return
+      }
+      alert('재발송 중 오류가 발생했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+  }
+})
+
+function renderReservations(list, total, hasMore) {
+  const view = document.getElementById('reservations-view')
+  if (!list.length) {
+    view.innerHTML = '<div class="empty">예약 내역이 없습니다.</div>'
+    return
+  }
+  const rows = list.map((r) => {
+    // 재발송 버튼은 실패 종류별로 다른 엔드포인트를 친다 — 순서호출 실패(notify_failed)는 기존 retry-notify,
+    // 그 외 접수 알림톡만 실패한 건(intakeNotifyStatus==='failed')은 신규 retry-intake. 완료/취소 건은 재발송 대상이 아니다.
+    const canRetryNotify = r.status === 'notify_failed'
+    const canRetryIntake = !canRetryNotify && r.intakeNotifyStatus === 'failed' && r.status !== 'completed' && r.status !== 'cancelled'
+    const canCancel = r.status === 'waiting' || r.status === 'called' || r.status === 'notify_failed'
+    const intakeFailMark = r.intakeNotifyStatus === 'failed' ? '<span class="intake-fail-mark">접수알림실패</span>' : ''
+    return `
+    <tr>
+      <td>#${r.queueNumber}</td>
+      <td>${escapeHtml(r.carNumber)}</td>
+      <td>${escapeHtml(r.serviceType || '-')}</td>
+      <td>${escapeHtml(r.phone)}</td>
+      <td><span class="badge ${escapeHtml(r.status)}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>${intakeFailMark}</td>
+      <td>${fmtDate(r.createdAt)}</td>
+      <td class="row-actions">
+        <button class="row-btn call" data-id="${r.id}" ${r.status !== 'waiting' ? 'disabled' : ''}>호출</button>
+        <button class="row-btn complete" data-id="${r.id}" ${r.status !== 'called' && r.status !== 'notify_failed' ? 'disabled' : ''}>완료</button>
+        ${canRetryNotify ? `<button class="row-btn retry" data-id="${r.id}">재발송</button>` : ''}
+        ${canRetryIntake ? `<button class="row-btn retry-intake" data-id="${r.id}">접수 재발송</button>` : ''}
+        <button class="row-btn cancel" data-id="${r.id}" ${canCancel ? '' : 'disabled'}>취소</button>
+        <button class="row-btn del" data-id="${r.id}">삭제</button>
+      </td>
+    </tr>
+  `}).join('')
+  view.innerHTML = `<table>
+    <thead><tr><th>순번</th><th>차량번호</th><th>정비항목</th><th>전화번호</th><th>상태</th><th>접수시간</th><th>동작</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>${hasMore ? '<div class="load-more-wrap"><button class="row-btn load-more" id="res-load-more" type="button">더 보기 (' + list.length + ' / ' + total + ')</button></div>' : ''}`
+}
+
+function renderPayments(list, total, hasMore) {
+  const view = document.getElementById('payments-view')
+  if (!list.length) {
+    view.innerHTML = '<div class="empty">결제 내역이 없습니다.</div>'
+    return
+  }
+  const rows = list.map((p) => {
+    const canRetry = p.status === 'receipt_failed'
+    return `
+    <tr>
+      <td>${escapeHtml(p.carNumber || '-')}</td>
+      <td>${escapeHtml(p.serviceType || '-')}</td>
+      <td>${escapeHtml(p.phone)}</td>
+      <td>${fmtAmount(p.amount)}</td>
+      <td><span class="badge ${escapeHtml(p.status)}">${escapeHtml(STATUS_LABEL[p.status] || p.status)}</span></td>
+      <td>${p.promoSent ? '발송완료' : fmtDate(p.promoAt)}</td>
+      <td>${fmtDate(p.createdAt)}</td>
+      <td class="row-actions">${canRetry ? `<button class="row-btn retry" data-id="${p.id}">재발송</button>` : ''}</td>
+    </tr>
+  `}).join('')
+  view.innerHTML = `<table>
+    <thead><tr><th>차량번호</th><th>정비항목</th><th>전화번호</th><th>결제금액</th><th>상태</th><th>프로모션</th><th>결제시간</th><th>동작</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>${hasMore ? '<div class="load-more-wrap"><button class="row-btn load-more" id="pay-load-more" type="button">더 보기 (' + list.length + ' / ' + total + ')</button></div>' : ''}`
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+
+function buildListParams(kind, offset, limit) {
+  const failed = (kind === 'reservations' ? resViewMode : payViewMode) === 'failed'
+  const params = new URLSearchParams()
+  if (currentStoreId) params.set('storeId', currentStoreId)
+  if (currentDateFilter) params.set('date', currentDateFilter)
+  if (!failed) {
+    const sf = kind === 'reservations' ? resStatusFilter : payStatusFilter
+    if (sf) params.set('status', sf)
+    if (currentSearchQuery) params.set('q', currentSearchQuery)
+  }
+  params.set('limit', String(limit))
+  params.set('offset', String(offset))
+  return params
+}
+
+function listPathFor(kind) {
+  const failed = (kind === 'reservations' ? resViewMode : payViewMode) === 'failed'
+  return failed ? `/api/${kind}/failed` : `/api/${kind}`
+}
+
+// 한 kind(reservations|payments)의 한 페이지를 가져와 상태를 갱신하고 다시 그린다.
+// append=false면 지금까지 쌓아둔 목록을 통째로 교체한다(필터 변경/폴링 새로고침),
+// append=true면 "더 보기"로 다음 페이지를 이어붙인다.
+async function loadKind(kind, offset, limit, append) {
+  const params = buildListParams(kind, offset, limit)
+  const data = await api(`${listPathFor(kind)}?${params.toString()}`)
+  const items = data[kind] || []
+  if (kind === 'reservations') {
+    reservationsList = append ? reservationsList.concat(items) : items
+    reservationsTotal = data.total || 0
+    reservationsHasMore = !!data.hasMore
+    renderReservations(reservationsList, reservationsTotal, reservationsHasMore)
+  } else {
+    paymentsList = append ? paymentsList.concat(items) : items
+    paymentsTotal = data.total || 0
+    paymentsHasMore = !!data.hasMore
+    renderPayments(paymentsList, paymentsTotal, paymentsHasMore)
+  }
+}
+
+// 탭 위 요약 카드 — 선택된 날짜/매장 기준(§5.1과 동일한 쿼리 파라미터)으로 접수/결제/발송실패 건수를 보여준다.
+// date를 비우면(전체기간 필터) 서버가 오늘 날짜로 기본 처리하므로, 실제로 집계된 날짜는 응답의 date로 표시한다.
+async function loadSummary() {
+  const params = new URLSearchParams()
+  if (currentDateFilter) params.set('date', currentDateFilter)
+  if (currentStoreId) params.set('storeId', currentStoreId)
+  const data = await api(`/api/admin/summary?${params.toString()}`)
+  renderSummary(data)
+}
+
+function renderSummary(data) {
+  const r = data.reservations || {}
+  const p = data.payments || {}
+  const failedTotal = (r.notify_failed || 0) + (data.intakeFailed || 0)
+  summaryCard.innerHTML = `
+    <div class="summary-item"><b>${escapeHtml(data.date || '')}</b> 요약</div>
+    <div class="summary-item">접수 ${r.total || 0}건
+      <span class="summary-sub">(대기 ${r.waiting || 0}·호출 ${r.called || 0}·완료 ${r.completed || 0}·취소 ${r.cancelled || 0})</span>
+    </div>
+    <div class="summary-item">결제 ${p.total || 0}건 · 합계 ${fmtAmount(p.amountSum || 0)}</div>
+    <div class="summary-item${failedTotal > 0 ? ' summary-alert' : ''}">발송실패 ${failedTotal}건</div>
+  `
+}
+
+// mode: 'reset' — 필터/매장/탭이 바뀌어 처음부터 다시 불러온다.
+// mode: 'refresh' — 폴링/액션 이후 갱신. 지금까지 로드된 페이지 크기(= "더 보기"로 불러온 만큼)는
+//   유지한 채 offset 0부터 그만큼만 다시 받아 화면을 최신 상태로 맞춘다.
+async function loadAll({ mode = 'reset' } = {}) {
+  try {
+    if (mode === 'reset') {
+      reservationsList = []
+      paymentsList = []
+      await Promise.all([
+        loadKind('reservations', 0, PAGE_LIMIT, false),
+        loadKind('payments', 0, PAGE_LIMIT, false),
+        loadSummary(),
+      ])
+    } else {
+      const resLimit = Math.min(Math.max(reservationsList.length, PAGE_LIMIT), 500)
+      const payLimit = Math.min(Math.max(paymentsList.length, PAGE_LIMIT), 500)
+      await Promise.all([
+        loadKind('reservations', 0, resLimit, false),
+        loadKind('payments', 0, payLimit, false),
+        loadSummary(),
+      ])
+    }
+    connStatus.textContent = ''
+    updateTabCounters()
+    updateFilterNote()
+    updateCallnextInfo()
+  } catch (e) {
+    if (e.message === 'UNAUTHORIZED') {
+      clearSession()
+      showLogin('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.')
+    } else {
+      connStatus.textContent = '연결 오류'
+    }
+  }
+}
+
+async function loadMore(kind) {
+  const list = kind === 'reservations' ? reservationsList : paymentsList
+  try {
+    await loadKind(kind, list.length, PAGE_LIMIT, true)
+    updateTabCounters()
+  } catch (e) {
+    if (e.message === 'UNAUTHORIZED') {
+      clearSession()
+      showLogin('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.')
+    } else {
+      alert('추가 목록을 불러오지 못했습니다.')
+    }
+  }
+}
+
+function updateTabCounters() {
+  document.getElementById('count-res').textContent = `${reservationsList.length} / ${reservationsTotal}`
+  document.getElementById('count-pay').textContent = `${paymentsList.length} / ${paymentsTotal}`
+}
+
+function updateCallnextInfo() {
+  if (!currentStoreId) {
+    callnextInfo.textContent = '매장을 선택하면 다음 손님을 호출할 수 있습니다.'
+    callnextBtn.disabled = true
+    return
+  }
+  if (resViewMode === 'failed') {
+    callnextInfo.textContent = '발송실패 화면을 보고 있습니다. 전체 보기로 전환하면 다음 손님을 호출할 수 있습니다.'
+    callnextBtn.disabled = true
+    return
+  }
+  // 현재 화면에 로드된 페이지 안에서만 계산한다 — 오늘 대기열이 페이지 한도(기본 100건)를
+  // 넘는 극단적인 경우에는 실제 대기 인원과 차이가 날 수 있지만, 실제 호출 순서는
+  // 서버가 매번 새로 계산하므로(§3.6) 여기 표시는 참고용 안내일 뿐이다.
+  const waiting = reservationsList.filter((r) => r.status === 'waiting')
+  callnextInfo.textContent = waiting.length
+    ? `대기중 ${waiting.length}건 · 다음 순번 #${[...waiting].sort((a, b) => a.queueNumber - b.queueNumber)[0].queueNumber}`
+    : '대기중인 예약이 없습니다.'
+  callnextBtn.disabled = waiting.length === 0
+}
+
+callnextBtn.addEventListener('click', async () => {
+  if (!currentStoreId) return
+  callnextBtn.disabled = true
+  callnextBtn.textContent = '호출 중...'
+  try {
+    const { ok, body } = await apiPost(`/api/queue/call-next?storeId=${encodeURIComponent(currentStoreId)}`)
+    if (!ok) {
+      alert(body.error || '호출에 실패했습니다.')
+    }
+    await loadAll({ mode: 'refresh' })
+  } catch (e) {
+    if (e.message === 'UNAUTHORIZED') {
+      clearSession()
+      showLogin('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.')
+    } else {
+      alert('호출 중 오류가 발생했습니다.')
+    }
+  } finally {
+    callnextBtn.textContent = '다음 손님 호출'
+  }
+})
+
+testSubmitBtn.addEventListener('click', async () => {
+  const carNumber = testCarInput.value.trim()
+  const serviceType = testServiceSelect.value
+  const phone = testPhoneInput.value.trim()
+  testMsg.textContent = ''
+  testMsg.className = 'testform-msg'
+
+  // hq_admin은 상단 드롭다운에서 선택한 매장, store_admin은 로그인 시 조회해둔 자기 매장(myMerchantId) 사용.
+  const merchantId = adminRole === 'store_admin' ? myMerchantId : stores.find((s) => s.id === currentStoreId)?.merchantId
+  if (!merchantId) {
+    testMsg.textContent = '상단에서 매장을 먼저 선택해주세요 ("전체 매장"으로는 테스트 예약을 만들 수 없습니다).'
+    testMsg.className = 'testform-msg err'
+    return
+  }
+
+  testSubmitBtn.disabled = true
+  try {
+    const res = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 내부 관리자 도구이므로 개인정보 동의 체크박스를 따로 두지 않는다 — 담당 직원이
+      // 고객을 대신해(전화/현장 접수 시) 동의를 확인했다는 전제로 true를 고정 전송한다.
+      body: JSON.stringify({ carNumber, phone, serviceType, merchantId, privacyConsent: true }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      testMsg.textContent = body.error || '등록 실패'
+      testMsg.className = 'testform-msg err'
+      return
+    }
+    testMsg.textContent = `등록 완료 (#${body.queueNumber} · ${body.serviceType}) · 앞으로 ${body.peopleAhead}명 남았다는 접수 알림이 발송됩니다. 호출은 POS/관리자 화면에서 직접 눌러주세요.`
+    testMsg.className = 'testform-msg ok'
+    testCarInput.value = ''
+    testPhoneInput.value = ''
+    await loadAll({ mode: 'refresh' })
+  } catch (e) {
+    testMsg.textContent = '요청 중 오류가 발생했습니다.'
+    testMsg.className = 'testform-msg err'
+  } finally {
+    testSubmitBtn.disabled = false
+  }
+})
+
+if (token) {
+  tryResumeSession()
+} else {
+  showLogin('')
+}
+</script>
+</body>
+</html>

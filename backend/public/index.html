@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="theme-color" content="#ffffff" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>" />
+<title>쉐보레 예약</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="badge">CHEVROLET</div>
+        <h1 id="title">예약하기</h1>
+        <p id="subtitle">차량번호를 입력해주세요</p>
+      </div>
+
+      <div class="steps">
+        <span class="dot active" data-step="car"></span>
+        <span class="dot" data-step="service"></span>
+        <span class="dot" data-step="phone"></span>
+      </div>
+
+      <section id="step-car" class="step">
+        <label class="field-label" for="carNumber">차량번호</label>
+        <div class="input-wrap">
+          <span class="input-icon" aria-hidden="true">🚘</span>
+          <input id="carNumber" type="text" inputmode="text" placeholder="예) 12가3456" autofocus autocomplete="off" />
+        </div>
+        <p id="carError" class="error" role="alert"></p>
+        <button id="toPhoneBtn" disabled>다음</button>
+        <button id="skipCarBtn" class="ghost hidden">차량번호 없이 진행</button>
+      </section>
+
+      <section id="step-service" class="step hidden">
+        <label class="field-label">정비 항목</label>
+        <div class="service-grid" id="serviceGrid">
+          <button type="button" class="service-opt" data-value="oil">엔진오일 교체</button>
+          <button type="button" class="service-opt" data-value="inspection">정기점검</button>
+          <button type="button" class="service-opt" data-value="tire">타이어 교체·펑크수리</button>
+          <button type="button" class="service-opt" data-value="battery">배터리 교체</button>
+          <button type="button" class="service-opt" data-value="brake">브레이크 정비</button>
+          <button type="button" class="service-opt" data-value="etc">기타 수리·상담</button>
+        </div>
+        <p id="serviceError" class="error" role="alert"></p>
+        <button id="toPhoneFromServiceBtn" disabled>다음</button>
+        <button id="backFromServiceBtn" class="ghost">이전으로</button>
+      </section>
+
+      <section id="step-phone" class="step hidden">
+        <label class="field-label" for="phone">전화번호</label>
+        <div class="input-wrap">
+          <span class="input-icon" aria-hidden="true">📱</span>
+          <input id="phone" type="tel" inputmode="tel" placeholder="010-1234-5678" autocomplete="off" />
+        </div>
+        <div id="amountWrap" class="input-wrap hidden">
+          <span class="input-icon" aria-hidden="true">💳</span>
+          <input id="amount" type="number" inputmode="numeric" placeholder="결제금액 (선택)" />
+        </div>
+        <p id="phoneError" class="error" role="alert"></p>
+
+        <!--
+          아래 동의 문구는 초안이며 정식 서비스 전 법무 검토가 필요하다.
+          회사명/연락처/구체적 보유기간(년수) 등은 임의로 기재하지 않았다 — 실제 값은 법무 검토 후 확정한다.
+        -->
+        <div class="consent-block">
+          <label class="consent-row">
+            <input type="checkbox" id="privacyConsent" />
+            <span><strong>[필수]</strong> 개인정보 수집·이용 동의</span>
+          </label>
+          <details class="consent-details">
+            <summary>자세히 보기</summary>
+            <p>
+              수집 항목: 차량번호, 전화번호<br />
+              수집 목적: 정비 예약 접수 및 순서 안내<br />
+              보유 기간: 관계 법령에 따른 보관 기간 경과 후 파기<br />
+              예약 순서를 알림톡으로 안내받으시려면 동의가 필요합니다. 동의를 거부하시면 예약 접수가 제한됩니다.
+            </p>
+          </details>
+          <label class="consent-row">
+            <input type="checkbox" id="marketingConsent" />
+            <span><strong>[선택]</strong> 광고성 정보 수신 동의</span>
+          </label>
+        </div>
+
+        <button id="submitBtn" disabled>
+          <span class="btn-label">예약 완료</span>
+          <span class="spinner hidden" aria-hidden="true"></span>
+        </button>
+        <button id="backBtn" class="ghost">이전으로</button>
+      </section>
+
+      <section id="step-done" class="step hidden">
+        <div class="check">
+          <svg viewBox="0 0 52 52" width="32" height="32">
+            <circle class="check-circle" cx="26" cy="26" r="24" fill="none" />
+            <path class="check-mark" fill="none" d="M14 27l7 7 17-17" />
+          </svg>
+        </div>
+        <h1 id="doneTitle">예약이 접수되었습니다</h1>
+        <p id="doneMessage">순서가 되면 알림톡으로 안내드려요.</p>
+      </section>
+    </div>
+  </main>
+  <script src="reservation.js"></script>
+</body>
+</html>

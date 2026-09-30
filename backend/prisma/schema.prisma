@@ -1,0 +1,223 @@
+// Design Ref: docs/02-design/features/multi-store-support.design.md §3.1
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id             String   @id @default(uuid())
+  merchantId     String   @unique
+  name           String
+  businessNumber String?
+  status         String   @default("active")
+  posToken       String?  @unique // 매장별 POS 탭앱 인증 토큰(64자 hex, X-Store-Token 헤더로 검증)
+  erpStoreCode   String?  @unique // 쉐보레 전산 측 매장 코드. 전산이 이 값으로 매장을 지정한다.
+  createdAt      DateTime @default(now())
+
+  reservations  Reservation[]
+  payments      Payment[]
+  queueCounters QueueCounter[]
+  adminUsers    AdminUser[]
+  erpOrders     ErpOrder[]
+  erpCarts      ErpCart[]
+  promoSends    PromoSend[]
+}
+
+// Design Ref: docs/02-design/features/multi-store-support.design.md Phase 3
+// role: "hq_admin"(storeId 없음, 전체 매장 접근) | "store_admin"(storeId 필수, 자기 매장만)
+model AdminUser {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String
+  role             String
+  storeId          String?
+  store            Store?    @relation(fields: [storeId], references: [id])
+  failedLoginCount Int       @default(0) // 로그인 실패 누적 횟수. 성공 시 0으로 리셋된다.
+  lockedUntil      DateTime? // 5회 실패 시 이 시각까지 로그인 자체를 막는다(423 응답).
+  createdAt        DateTime  @default(now())
+  lastLoginAt      DateTime?
+}
+
+model Reservation {
+  id             String    @id @default(uuid())
+  storeId        String
+  store          Store     @relation(fields: [storeId], references: [id])
+  carNumber      String
+  phone          String
+  serviceType    String
+  queueNumber    Int
+  serviceDate    String // 접수 시점 KST 날짜 'YYYY-MM-DD'. 대기열/조회를 "오늘 것만"으로 한정할 때 쓴다.
+  idempotencyKey String?   @unique
+  status         String    @default("waiting") // waiting | called | notify_failed | completed | cancelled
+  createdAt      DateTime  @default(now())
+  calledAt       DateTime?
+  completedAt    DateTime?
+
+  privacyConsentAt   DateTime? // 개인정보 수집·이용 동의 시각
+  marketingConsentAt DateTime? // 광고성 정보 수신 동의 시각(선택) — null이면 프로모션 발송 대상에서 제외
+  anonymizedAt       DateTime? // 보관기간(DATA_RETENTION_DAYS) 경과 후 파기(익명화) 시각
+
+  erpCarts ErpCart[]
+
+  intakeNotifyStatus String? // null = 정상/미시도, 'failed' = 접수(대기번호) 알림톡 발송 실패. 성공 시엔
+  // 아무것도 쓰지 않는다(null 유지) — 해피패스에 DB 쓰기를 늘리지 않기 위함(계약 v3 §1).
+
+  @@index([storeId])
+  @@index([storeId, serviceDate, status])
+  @@index([storeId, createdAt])
+  @@index([storeId, phone])
+  @@index([storeId, intakeNotifyStatus])
+}
+
+model Payment {
+  id             String    @id @default(uuid())
+  storeId        String
+  store          Store     @relation(fields: [storeId], references: [id])
+  paymentKey     String?   @unique
+  carNumber      String?
+  serviceType    String?
+  phone          String?
+  amount         Int?
+  status         String    @default("requested") // requested | receipt_sent | receipt_failed | cancelled
+  promoAt        DateTime
+  promoSent      Boolean   @default(false)
+  promoSentAt    DateTime?
+  promoClaimedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  privacyConsentAt   DateTime?
+  marketingConsentAt DateTime?
+  anonymizedAt       DateTime?
+
+  @@index([storeId])
+  @@index([storeId, createdAt])
+  @@index([promoAt, promoSent, promoClaimedAt])
+}
+
+// Design Ref: Phase 4 결제 웹훅 수신. x-toss-webhook-id로 중복 수신을 막는다
+// (토스 쪽에서 같은 이벤트를 재전송할 수 있다고 문서에 명시되어 있음).
+model WebhookEvent {
+  id          String   @id // x-toss-webhook-id 값 그대로 사용
+  eventType   String
+  receivedAt  DateTime @default(now())
+
+  // 개인정보 자체는 거의 없지만(id는 토스가 발급한 웹훅 id) 중복 수신 방지 목적상 계속 쌓여서
+  // 무한 증가한다. 보관기간이 지나면 다른 모델처럼 익명화할 것도 없으니 그냥 행을 지운다
+  // (purgeExpiredWebhookEvents). receivedAt으로 대상을 찾으므로 인덱스를 둔다.
+  @@index([receivedAt])
+}
+
+// Plan SC: FR-06 — 매장/날짜별 원자적 채번으로 동시 예약 요청 시 중복 대기번호 방지
+model QueueCounter {
+  id      String @id @default(uuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+  date    String
+  counter Int    @default(0)
+
+  @@unique([storeId, date])
+}
+
+model RateLimitHit {
+  key         String   @id
+  windowStart DateTime
+  count       Int
+
+  @@index([windowStart])
+}
+
+// 쉐보레 전산(ERP) -> 우리 -> 토스 주문 생성 중개 기록 (ERP_CONTRACT_V1 §2.2).
+// referenceId(전산 측 주문 참조번호)가 멱등키다 — 같은 값으로 재호출해도 토스에 중복 주문을
+// 만들지 않는다(tossOrderKey를 referenceId에서 안정적으로 파생시켜 재시도해도 동일하게 만든다).
+model ErpOrder {
+  id           String    @id @default(uuid())
+  storeId      String
+  store        Store     @relation(fields: [storeId], references: [id])
+  referenceId  String    @unique // 전산 측 주문 참조번호 = 멱등키
+  tossOrderKey String    @unique // 토스로 보낸 orderKey (referenceId에서 파생, 안정적)
+  tossOrderId  String? // 토스가 돌려준 주문 id (응답 스키마 미확정이라 nullable)
+  totalAmount  Int
+  status       String    @default("created") // created | failed | paid
+  itemsJson    String // 전산이 보낸 items 원본 JSON (감사/디버깅/결제통보 회신용)
+  memo         String?
+  tossRawJson  String? // 토스 응답 원본(성공/실패 모두) — 스키마 미확정이라 통째로 보관
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  paidAt       DateTime?
+
+  // memo/itemsJson에 전산이 보낸 차량번호·고객명이 그대로 들어간다(개인정보). 보관기간(3년)이
+  // 지나면 purgeExpiredPersonalData가 이 시각을 찍고 memo를 지운다 — Reservation/Payment와
+  // 같은 "레코드는 남기고 개인정보만 지우는" 방식(매장별 주문 건수 통계가 깨지지 않게).
+  anonymizedAt DateTime?
+
+  @@index([storeId, createdAt])
+  @@index([status])
+}
+
+// 전산(ERP) "물건 담기" -> POS 플러그인 폴링 연동 (POS-CART-BRIDGE §1). ErpOrder(토스 Open API로
+// 주문 자체를 생성하는 기존 경로)와는 완전히 별개다 -- 그 경로로 만든 주문은 POS에서 결제할 수
+// 없다는 게 실증됐다(docs/ERP연동-결제경로-조사결과.md). 이 테이블은 "전산이 담아둔 장바구니"를
+// POS 플러그인이 가져가 posPluginSdk.draftOrder.addLineItem()으로 POS 자체 장바구니에 직접 옮겨
+// 담게 하는 중계용 큐일 뿐, 토스와는 아무것도 통신하지 않는다.
+model ErpCart {
+  id           String    @id @default(uuid())
+  storeId      String
+  store        Store     @relation(fields: [storeId], references: [id])
+  referenceId  String    @unique // 전산 측 참조번호 = 멱등키
+  itemsJson    String              // items 배열 원본 JSON
+  totalAmount  Int
+  memo         String?
+  autoPay      Boolean   @default(true)
+  status       String    @default("pending") // pending | loaded | failed | dismissed | expired | cancelled | paid
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  loadedAt     DateTime?
+
+  // 전산이 보낸 차량번호. memo에도 같은 값이 들어가지만 그건 사람이 POS 화면에서 읽는 자유
+  // 문자열이라 기계가 확실히 못 읽는다. 예약 손님과 잇는 데는 이 필드를 쓴다.
+  carNumber      String?
+  // 접수 당시 그날 대기 중이던 예약과 자동으로 이어진 결과. 확실할 때만(정확히 1건 일치) 붙인다 —
+  // 잘못 이으면 남의 정비 이력에 부품이 붙고 자동완료로 엉뚱한 손님이 대기열에서 사라진다.
+  reservationId  String?
+  reservation    Reservation? @relation(fields: [reservationId], references: [id])
+
+  // POS에서 실제 결제가 끝났을 때 채워진다. Payment 테이블에 넣지 않는 이유: 그쪽은 고객에게
+  // 개인정보·광고 수신 동의를 받은 흐름이고, 전산 결제는 POS에서 동의 없이 일어난다.
+  // 동의 없는 레코드를 그 파이프라인에 섞으면 프로모션 대상 판정이 흐려진다.
+  paidAt         DateTime?
+  tossPaymentId  String?
+  tossOrderId    String?
+
+  @@index([storeId, status, createdAt])
+  @@index([storeId, carNumber])
+}
+
+// 매장 직원이 POS 이력 화면에서 손으로 보낸 홍보 메시지 기록.
+//
+// 자동 발송(Payment.promoSent, 결제 3개월 뒤)과 왜 따로 두나:
+//   - 전산으로만 정비받은 손님은 Payment 레코드가 없다. 자동 발송 대상이 아니지만
+//     수동으로는 보낼 수 있어야 한다(동의가 있다면).
+//   - 광고 발송은 "누가 언제 누구에게 보냈는지"가 남아야 한다. 분쟁이 생기면 이 기록이
+//     근거가 된다. 결제 레코드의 플래그 하나로는 그걸 담을 수 없다.
+//   - 같은 손님에게 반복 발송하는 걸 막으려면 발송 시각이 남아 있어야 한다.
+//
+// phone을 저장하는 이유: 나중에 그 번호로 발송했는지 확인해야 하는데, 예약/결제 레코드가
+// 개인정보 파기로 익명화되면 되짚을 수 없게 된다. 이 테이블도 같은 파기 대상에 넣는다.
+model PromoSend {
+  id        String   @id @default(uuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  carNumber String?
+  phone     String?
+  sentBy    String? // 보낸 사람(관리자 계정 id). POS 탭앱에서 보낸 건 매장 단위라 null이다.
+  sentAt    DateTime @default(now())
+
+  anonymizedAt DateTime? // 보관기간 경과 후 phone/carNumber를 지운 시각
+
+  @@index([storeId, carNumber, sentAt])
+  @@index([storeId, sentAt])
+}
