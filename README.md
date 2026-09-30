@@ -1,12 +1,27 @@
-# car-service-queue — 정비 예약·대기열 플러그인
+<div align="center">
 
-> 국내 완성차 브랜드 직영 정비센터 매장의 토스 결제 단말과 POS 안에서 동작하는 정비 예약, 대기 호출, 전자영수증·프로모션 알림톡 시스템. 정비 전산(ERP)–POS 장바구니 연동을 포함한다.
+# car-service-queue
+
+**정비 예약·대기열 플러그인**
+
+국내 완성차 브랜드 직영 정비센터 매장의 토스 결제 단말과 POS 안에서 동작하는 정비 예약, 대기 호출, 전자영수증·프로모션 알림톡 시스템. 정비 전산(ERP)–POS 장바구니 연동을 포함한다.
 
 ![Node.js](https://img.shields.io/badge/Node.js-18-339933?style=flat-square&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square&logo=express&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?style=flat-square&logo=prisma&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white) ![Google Cloud Run](https://img.shields.io/badge/Google_Cloud_Run-asia--northeast3-4285F4?style=flat-square&logo=googlecloud&logoColor=white) ![Toss Place SDK](https://img.shields.io/badge/Toss_Place_SDK-Front--POS-0064FF?style=flat-square) ![Python PyQt5](https://img.shields.io/badge/Python-PyQt5-3776AB?style=flat-square&logo=python&logoColor=white)
 
-- **문제**: 정비센터 매장의 예약 접수, 대기 순서 호출, 결제 후 영수증·프로모션 안내를 매장의 결제 단말과 POS 안에서 처리하고, 정비 전산에 담은 품목까지 POS 결제로 넘겨야 했다.
-- **해결**: 토스프론트 플러그인, POS 탭앱, 관리자 웹, 정비 전산 시뮬레이터가 Express 백엔드 하나를 공유하는 구조로 만들고, 매장 단위 격리와 중복 방지를 갖춘 멀티테넌트로 확장해 GCP Cloud Run에 올렸다.
-- **내 역할**: 1인 프로젝트로 요구사항 정리, 설계, 구현, 테스트, 배포와 운영 대응을 전담했다.
+[핵심 기술 과제](#핵심-기술-과제와-해결) · [아키텍처](#아키텍처) · [실행 방법](#실행-방법) · [회고](#회고와-개선-과제)
+
+</div>
+
+| 기간 | 역할 | 규모 | 테스트 | 배포 |
+|:---:|:---:|:---:|:---:|:---:|
+| 2026.07 – 2026.08 | 1인 · 설계·구현·테스트·배포 전담 | 원본 커밋 95 · 목표 매장 500개 | node:test + supertest · CI 잡 3개 | GCP Cloud Run |
+
+> [!IMPORTANT]
+> **문제** — 정비센터 매장의 예약 접수, 대기 순서 호출, 결제 후 영수증·프로모션 안내를 매장의 결제 단말과 POS 안에서 처리하고, 정비 전산에 담은 품목까지 POS 결제로 넘겨야 했다.
+>
+> **해결** — 토스프론트 플러그인, POS 탭앱, 관리자 웹, 정비 전산 시뮬레이터가 Express 백엔드 하나를 공유하는 구조로 만들고, 매장 단위 격리와 중복 방지를 갖춘 멀티테넌트로 확장해 GCP Cloud Run에 올렸다.
+>
+> **내 역할** — 1인 프로젝트로 요구사항 정리, 설계, 구현, 테스트, 배포와 운영 대응을 전담했다.
 
 ## 프로젝트 개요
 
@@ -125,6 +140,14 @@ flowchart LR
 
 ## 핵심 기술 과제와 해결
 
+| # | 과제 | 핵심 기법 |
+|:-:|---|---|
+| 1 | [매장·날짜별 원자적 대기번호와 멱등 접수](#1-매장날짜별-원자적-대기번호와-멱등-접수) | `INSERT … ON CONFLICT` 한 문장으로 채번 · `Idempotency-Key`를 unique 컬럼에 저장 · 같은 키의 재요청은 기존 예약 반환 |
+| 2 | [호출과 재발송 중복 방지](#2-호출과-재발송-중복-방지) | 기대 상태를 조건으로 건 `updateMany` · 조건을 통과한 한 요청만 알림 발송 · 반환 count로 처리 여부 판별 |
+| 3 | [토스 웹훅 처리 순서](#3-토스-웹훅-처리-순서) | 5분 타임스탬프 확인과 HMAC 서명 상수 시간 비교 · 본 처리 전에 이벤트 ID 먼저 기록 · 실패하면 기록을 지우고 500 반환 |
+| 4 | [다중 인스턴스에서도 유지되는 레이트리밋](#4-다중-인스턴스에서도-유지되는-레이트리밋) | Postgres upsert 고정 윈도 스토어(`RateLimitHit`) · 인스턴스 사이에 한도 공유 · POS 폴링만 메모리 리미터로 분리 |
+| 5 | [정비 전산–POS 연동 경로 전환](#5-정비-전산pos-연동-경로-전환) | 실호출로 스펙 확정 · POS 플러그인 SDK `draftOrder` 장바구니 방식으로 경로 전환 · 서버가 우편함 역할 |
+
 ### 1. 매장·날짜별 원자적 대기번호와 멱등 접수
 
 - **문제**: 오늘 첫 두 손님이 거의 동시에 접수하면 두 트랜잭션이 모두 카운터가 없다고 보고 새로 만들다 `(storeId, date)` unique 제약(P2002)에 걸려 500이 나갔다. READ COMMITTED에서는 트랜잭션 안의 `SELECT`가 동시 실행을 막지 않는다. 네트워크가 끊겼다 재시도된 요청이 예약을 두 번 만드는 문제도 있었다.
@@ -191,6 +214,9 @@ erDiagram
   }
 ```
 
+<details>
+<summary><b>모델별 역할과 핵심 제약 펼치기</b></summary>
+
 | 모델 | 역할 | 핵심 제약 |
 |---|---|---|
 | `Store` | 매장 | `merchantId`, `posToken`, `erpStoreCode` 각각 unique |
@@ -203,6 +229,8 @@ erDiagram
 | `PromoSend` | 수동 홍보 발송 기록 | 보관기간 뒤 전화번호 삭제 |
 | `WebhookEvent` | 웹훅 중복 수신 방지 | 토스 웹훅 ID를 기본키로 사용 |
 | `RateLimitHit` | 레이트리밋 카운터 | 키별 고정 윈도 |
+
+</details>
 
 상태값은 다음과 같다.
 
@@ -258,6 +286,9 @@ npm test
 
 ## 폴더 구조
 
+<details>
+<summary><b>폴더 트리 펼치기</b></summary>
+
 ```text
 car-service-queue/
 ├─ backend/                  # 공유 서버. front-plugin, pos-plugin/dist를 로컬 미리보기용으로 정적 서빙
@@ -280,6 +311,8 @@ car-service-queue/
 ├─ .github/workflows/        # CI
 └─ Dockerfile, docker-entrypoint.sh   # Cloud Run 배포용 이미지
 ```
+
+</details>
 
 ### 관련 문서
 
@@ -309,3 +342,11 @@ car-service-queue/
 | 부팅 시 마이그레이션 분리 | `RUN_MIGRATIONS_ON_BOOT` 기본값이 `true`라 동시 콜드스타트에서 잠금 경합 위험이 있다. `false`로 바꾸고 Cloud Run Job 등으로 분리해야 한다 |
 | 웹훅의 `paymentKey` 대응 | payload에 `paymentKey` 필드가 없어 `orderId`와 같다고 가정했다. 실결제로 확인하지 못했다 |
 | 전산 결제완료 회신(2단계) | 서버가 전산에 먼저 알리는 콜백은 미구현이다. POS가 결제 완료를 보고하면 전산이 조회로 확인하는 방식만 가능하다 |
+
+---
+
+<div align="center">
+
+[다른 프로젝트 보기](https://github.com/pyobonboy) · [pyobon07@naver.com](mailto:pyobon07@naver.com)
+
+</div>
